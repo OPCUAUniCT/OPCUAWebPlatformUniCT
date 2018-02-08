@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.3.350.6" />
   </ItemGroup>
 
   <ItemGroup>

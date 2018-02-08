@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Opc.Ua;
 
 namespace WebPlatform.Controllers
 {
@@ -13,6 +14,7 @@ namespace WebPlatform.Controllers
         [HttpGet]
         public IEnumerable<string> Get()
         {
+            IEncoder encoder;
             return new string[] { "value1", "value2" };
         }
 
