@@ -7,11 +7,14 @@
 
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
+    <ExternalConsole>false</ExternalConsole>
     <LaunchBrowser>false</LaunchBrowser>
     <LaunchUrl>api/values</LaunchUrl>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="wwwroot\" />
+    <Folder Include="Configurations\" />
+    <Folder Include="Configurations\OptionsModels\" />
   </ItemGroup>
 
   <ItemGroup>
