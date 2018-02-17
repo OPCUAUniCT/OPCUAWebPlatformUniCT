@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Opc.Ua;
-using WebPlatform.Configurations.OptionsModels;
+using WebPlatform.Models.OptionsModels;
 
 namespace WebPlatform.Controllers
 {
@@ -14,9 +14,7 @@ namespace WebPlatform.Controllers
     public class ValuesController : Controller
     {
 
-        public ValuesController()
-        {
-        }
+        public ValuesController() {}
 
         // GET api/values
         [HttpGet]

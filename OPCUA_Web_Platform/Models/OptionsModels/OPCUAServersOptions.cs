@@ -1,5 +1,5 @@
 ﻿using System;
-namespace WebPlatform.Configurations.OptionsModels
+namespace WebPlatform.Models.OptionsModels
 {
     public class OPCUAServersOptions
     {
