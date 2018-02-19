@@ -8,6 +8,10 @@
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
     <ExternalConsole>false</ExternalConsole>
+    <EnvironmentVariables>
+      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
+      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
+    </EnvironmentVariables>
     <LaunchBrowser>false</LaunchBrowser>
     <LaunchUrl>api/values</LaunchUrl>
   </PropertyGroup>
@@ -15,6 +19,7 @@
     <Folder Include="wwwroot\" />
     <Folder Include="Models\Auth\" />
     <Folder Include="Models\OptionsModels\" />
+    <Folder Include="Auth\" />
   </ItemGroup>
 
   <ItemGroup>

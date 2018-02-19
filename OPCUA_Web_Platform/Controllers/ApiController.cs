@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebPlatform.Models.DataSet;
 
@@ -9,6 +10,7 @@ using WebPlatform.Models.DataSet;
 
 namespace WebPlatform.Controllers
 {
+    [Authorize]
     [Route("[controller]")]
     public class ApiController : Controller
     {
@@ -17,13 +19,6 @@ namespace WebPlatform.Controllers
         {
             return Ok("Ti ritorno gli url dei Data Set");
         }
-
-        //[HttpGet("data-sources/{ds_id:int}/nodes")]
-        //public IActionResult GetDataSources(int ds_id)
-        //{
-        //    //return Ok($"Ti ritorno l'entry point al Data Set {ds_id}");
-        //    return GetDataSources(ds_id, "0-85");
-        //}
 
         [HttpGet("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-\\S+$)?}")]
         public IActionResult GetNode(int ds_id, string node_id = "0-85")
