@@ -46,6 +46,7 @@ namespace WebPlatform
             //Add service related to IOptions feature in Controllers
             services.AddOptions();
             services.Configure<JwtOptions>(Configuration.GetSection("JwtOptions"));
+            services.Configure<OPCUAServersOptions>(Configuration.GetSection("OPCUAServersOptions"));
 
             services.AddMvc();
 

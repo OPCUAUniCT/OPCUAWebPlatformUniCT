@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using WebPlatform.Models.DataSet;
+using WebPlatform.Models.OptionsModels;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -14,10 +16,19 @@ namespace WebPlatform.Controllers
     [Route("[controller]")]
     public class ApiController : Controller
     {
+        private OPCUAServers[] _UAServers;
+
+        public ApiController(IOptions<OPCUAServersOptions> servers)
+        {
+            this._UAServers = servers.Value.Servers;
+            for (int i = 0; i < _UAServers.Length; i++) _UAServers[i].Id = i;
+            
+        }
+
         [HttpGet("data-sets")]
         public IActionResult GetDataSets()
         {
-            return Ok("Ti ritorno gli url dei Data Set");
+            return Ok( _UAServers );
         }
 
         [HttpGet("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-\\S+$)?}")]

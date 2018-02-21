@@ -5,13 +5,14 @@ namespace WebPlatform.Models.OptionsModels
     {
         public OPCUAServersOptions() {}
 
-        public OPCUAServerUrl[] Urls { get; set; }
+        public OPCUAServers[] Servers { get; set; }
     }
 
-    public class OPCUAServerUrl {
+    public class OPCUAServers {
 
-        public OPCUAServerUrl() {}
+        public OPCUAServers() {}
 
+        public int Id { get; set; }
         public string Name { get; set; }
         public string Url { get; set; }
     }
