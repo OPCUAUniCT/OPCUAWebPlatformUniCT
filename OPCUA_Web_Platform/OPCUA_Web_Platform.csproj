@@ -8,10 +8,6 @@
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
     <ExternalConsole>false</ExternalConsole>
-    <EnvironmentVariables>
-      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
-      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
-    </EnvironmentVariables>
     <LaunchBrowser>false</LaunchBrowser>
     <LaunchUrl>api/values</LaunchUrl>
   </PropertyGroup>
@@ -20,6 +16,8 @@
     <Folder Include="Models\Auth\" />
     <Folder Include="Models\OptionsModels\" />
     <Folder Include="Auth\" />
+    <Folder Include="OPC UA Layer\" />
+    <Folder Include="Models\OPCUA\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,5 +31,6 @@
 
   <ItemGroup>
     <Compile Remove="Models\AuthCredentials.cs" />
+    <Compile Remove="OPC UA Layer\EmptyClass.cs" />
   </ItemGroup>
 </Project>

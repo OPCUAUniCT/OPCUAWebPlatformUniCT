@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using WebPlatform.Auth;
 using WebPlatform.Models.OptionsModels;
+using WebPlatform.OPCUALayer;
 
 namespace WebPlatform
 {
@@ -53,6 +54,9 @@ namespace WebPlatform
             //Register server specific for the platform
             services.AddTransient<ITokenManager, JwtManager>();
             services.AddTransient<IAuth, StubAuthenticator>();
+
+            //Register a singleton service managing OPC UA interactions
+            services.AddSingleton<IUAClientSingleton, UAClient>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
