@@ -1,4 +1,4 @@
-﻿namespace OPCWebApi.Models
+﻿namespace WebPlatform.Models.OPCUA
 {
     public class OPCElementToMonitor
     {

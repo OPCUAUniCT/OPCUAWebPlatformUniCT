@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using WebPlatform.Extensions;
 using Opc.Ua;
 using Opc.Ua.Client;
+using WebPlatform.Models.OPCUA;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -13,10 +14,11 @@ namespace WebPlatform.OPCUALayer
         Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr);
         Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeId);
         Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
+        Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
     }
 
-    public interface IUAClientSingleton : IUAClient { }
+    public interface IUAClientSingleton : IUAClient {}
 
     public class UAClient : IUAClientSingleton
     {
@@ -109,6 +111,22 @@ namespace WebPlatform.OPCUALayer
             }
             return targetId == ObjectTypeIds.FolderType;
         }
+
+        public async Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode variableNode)
+        {
+            Session session = await GetSessionByUrlAsync(serverUrl);
+            //DataValue dataValue = ReadDataValue(session, variableNode.NodeId)[0];
+            
+            
+            
+            return null;
+        }
+        
+        /*//TODO: sposta la funzione sotto tra le private
+        private DataValueCollection ReadDataValue(Session session, NodeId nodeId)
+        {
+            ReadValueIdCollection nodeToRead 
+        }*/
 
         #region private methods
 

@@ -73,6 +73,9 @@ namespace WebPlatform.Controllers
                 case NodeClass.Variable:
                     result["type"] = "variable";
                     //TODO: gestire tutta la decodifica delle variabili. Creare un nuovo pbi;
+                    var varNode = (VariableNode) sourceNode;
+                    var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
+                    
                     break;
                 case NodeClass.Object:
                     result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
