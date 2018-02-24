@@ -115,11 +115,10 @@ namespace WebPlatform.OPCUALayer
         public async Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode variableNode)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
+            var typeManager = new DataTypeManager(session);
             //DataValue dataValue = ReadDataValue(session, variableNode.NodeId)[0];
-            
-            
-            
-            return null;
+
+            return typeManager.GetUaValue(variableNode);
         }
         
         /*//TODO: sposta la funzione sotto tra le private

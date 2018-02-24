@@ -14,13 +14,13 @@
     <Folder Include="Models\Auth\" />
     <Folder Include="Models\OptionsModels\" />
     <Folder Include="Auth\" />
-    <Folder Include="OPC UA Layer\" />
     <Folder Include="Models\OPCUA\" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.5" />
     <PackageReference Include="Newtonsoft.Json.Schema" Version="3.0.7" />
-    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.3.350.6" />
+    <PackageReference Include="NJsonSchema" Version="9.10.27" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.3.351.7" />
   </ItemGroup>
   <ItemGroup>
     <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.0.0" />

@@ -5,14 +5,14 @@ namespace WebPlatform.Models.OPCUA
 {
     public class UaValue
     {
-        public readonly JObject Value;
+        public readonly JToken Value;
         public readonly JSchema Schema;
 
         public UaValue()
         {
         }
 
-        public UaValue(JObject value, JSchema schema)
+        public UaValue(JToken value, JSchema schema)
         {
             Value = value;
             Schema = schema;

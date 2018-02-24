@@ -40,7 +40,7 @@ namespace WebPlatform.Controllers
         public async Task<IActionResult> GetNode(int ds_id, string node_id = "0-85")
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
-            var serverUrl = _UAServers[0].Url;
+            var serverUrl = _UAServers[ds_id].Url;
             var decodedNodeId = WebUtility.UrlDecode(node_id);
             
             Node sourceNode;
@@ -75,7 +75,8 @@ namespace WebPlatform.Controllers
                     //TODO: gestire tutta la decodifica delle variabili. Creare un nuovo pbi;
                     var varNode = (VariableNode) sourceNode;
                     var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
-                    
+                    result["value"] = uaValue.Value;
+                    result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
                     break;
                 case NodeClass.Object:
                     result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
