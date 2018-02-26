@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Xml;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 using Newtonsoft.Json.Schema.Generation;
@@ -97,23 +98,54 @@ namespace WebPlatform.OPCUALayer
             }
             else if (variableNode.ValueRank == 1)
             {
-                //TODO: Gestire il caso degli array
-                //throw new NotImplementedException();
+               
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
                 var schema = new JSchema
                 {
                     Type = JSchemaType.Array,
-                    Items = { schemaGenerator.Generate(typeof(bool)) }
+                    Items = { new JSchema { Type = JSchemaType.Boolean } },
+                    MinimumItems = arr.Length,
+                    MaximumItems = arr.Length 
                 };
                 return new UaValue(jArray, schema);
             }
             else
             {
-                var arr = (Matrix)value.Value;
-                var jArray = JObject.FromObject(arr);
-                var schema = schemaGenerator.Generate(typeof(Matrix));
-                return new UaValue(jArray, schema);
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+                
+                var dimLen = matrix.Dimensions.Length;
+                JSchema innerSchema = new JSchema();
+                JSchema outerSchema = new JSchema();
+                for (int dim = dimLen-1; dim >= 0; dim--)
+                {
+                    if (dim == dimLen-1)
+                    {
+                        innerSchema = new JSchema
+                        {
+                            Type = JSchemaType.Array,
+                            Items = { new JSchema { Type = JSchemaType.Boolean } },
+                            MinimumItems = matrix.Dimensions[dim],
+                            MaximumItems = matrix.Dimensions[dim]
+                        };
+                    }
+                    else
+                    {
+                        outerSchema = new JSchema
+                        {
+                            Type = JSchemaType.Array,
+                            Items = { innerSchema },
+                            MinimumItems = matrix.Dimensions[dim],
+                            MaximumItems = matrix.Dimensions[dim]
+                        };
+                        innerSchema = outerSchema;
+                    }
+                }
+
+                return new UaValue(jArr, outerSchema);
             }
         }
 
@@ -127,10 +159,55 @@ namespace WebPlatform.OPCUALayer
                 var schema = schemaGenerator.Generate(typeof(int));
                 return new UaValue(jIntVal, schema);
             }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                var schema = new JSchema
+                {
+                    Type = JSchemaType.Array,
+                    Items = { new JSchema { Type = JSchemaType.Integer } },
+                    MinimumItems = arr.Length,
+                    MaximumItems = arr.Length
+                };
+                return new UaValue(jArray, schema);
+            }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var dimLen = matrix.Dimensions.Length;
+                JSchema innerSchema = new JSchema();
+                JSchema outerSchema = new JSchema();
+                for (int dim = dimLen - 1; dim >= 0; dim--)
+                {
+                    if (dim == dimLen - 1)
+                    {
+                        innerSchema = new JSchema
+                        {
+                            Type = JSchemaType.Array,
+                            Items = { new JSchema { Type = JSchemaType.Integer } },
+                            MinimumItems = matrix.Dimensions[dim],
+                            MaximumItems = matrix.Dimensions[dim]
+                        };
+                    }
+                    else
+                    {
+                        outerSchema = new JSchema
+                        {
+                            Type = JSchemaType.Array,
+                            Items = { innerSchema },
+                            MinimumItems = matrix.Dimensions[dim],
+                            MaximumItems = matrix.Dimensions[dim]
+                        };
+                        innerSchema = outerSchema;
+                    }
+                }
+
+                return new UaValue(jArr, outerSchema);
             }
         }
 
