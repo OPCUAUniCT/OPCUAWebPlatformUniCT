@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -8,6 +10,7 @@ using Newtonsoft.Json.Schema.Generation;
 using NJsonSchema;
 using Opc.Ua;
 using Opc.Ua.Client;
+using WebPlatform.Extensions;
 using WebPlatform.Models.OPCUA;
 
 namespace WebPlatform.OPCUALayer
@@ -92,7 +95,7 @@ namespace WebPlatform.OPCUALayer
             
             if (variableNode.ValueRank == -1)
             {
-                var jBoolVal = new JValue(Boolean.Parse(value.Value.ToString()));
+                var jBoolVal = new JValue(value.Value);
                 var schema = schemaGenerator.Generate(typeof(Boolean));
                 return new UaValue(jBoolVal, schema);
             }
@@ -101,13 +104,8 @@ namespace WebPlatform.OPCUALayer
                
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = new JSchema
-                {
-                    Type = JSchemaType.Array,
-                    Items = { new JSchema { Type = JSchemaType.Boolean } },
-                    MinimumItems = arr.Length,
-                    MaximumItems = arr.Length 
-                };
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Boolean });
+                
                 return new UaValue(jArray, schema);
             }
             else
@@ -115,37 +113,11 @@ namespace WebPlatform.OPCUALayer
                 var matrix = (Matrix)value.Value;
                 var arr = matrix.ToArray();
                 var arrStr = JsonConvert.SerializeObject(arr);
-                var jArr = JArray.Parse(arrStr);
+                var jArray = JArray.Parse(arrStr);
                 
-                var dimLen = matrix.Dimensions.Length;
-                JSchema innerSchema = new JSchema();
-                JSchema outerSchema = new JSchema();
-                for (int dim = dimLen-1; dim >= 0; dim--)
-                {
-                    if (dim == dimLen-1)
-                    {
-                        innerSchema = new JSchema
-                        {
-                            Type = JSchemaType.Array,
-                            Items = { new JSchema { Type = JSchemaType.Boolean } },
-                            MinimumItems = matrix.Dimensions[dim],
-                            MaximumItems = matrix.Dimensions[dim]
-                        };
-                    }
-                    else
-                    {
-                        outerSchema = new JSchema
-                        {
-                            Type = JSchemaType.Array,
-                            Items = { innerSchema },
-                            MinimumItems = matrix.Dimensions[dim],
-                            MaximumItems = matrix.Dimensions[dim]
-                        };
-                        innerSchema = outerSchema;
-                    }
-                }
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Boolean });
 
-                return new UaValue(jArr, outerSchema);
+                return new UaValue(jArray, outerSchema);
             }
         }
 
@@ -155,7 +127,7 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jIntVal = new JValue(int.Parse(value.Value.ToString()));
+                var jIntVal = new JValue(value.Value);
                 var schema = schemaGenerator.Generate(typeof(int));
                 return new UaValue(jIntVal, schema);
             }
@@ -163,13 +135,8 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = new JSchema
-                {
-                    Type = JSchemaType.Array,
-                    Items = { new JSchema { Type = JSchemaType.Integer } },
-                    MinimumItems = arr.Length,
-                    MaximumItems = arr.Length
-                };
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Integer });
+                
                 return new UaValue(jArray, schema);
             }
             else
@@ -179,34 +146,7 @@ namespace WebPlatform.OPCUALayer
                 var arrStr = JsonConvert.SerializeObject(arr);
                 var jArr = JArray.Parse(arrStr);
 
-                var dimLen = matrix.Dimensions.Length;
-                JSchema innerSchema = new JSchema();
-                JSchema outerSchema = new JSchema();
-                for (int dim = dimLen - 1; dim >= 0; dim--)
-                {
-                    if (dim == dimLen - 1)
-                    {
-                        innerSchema = new JSchema
-                        {
-                            Type = JSchemaType.Array,
-                            Items = { new JSchema { Type = JSchemaType.Integer } },
-                            MinimumItems = matrix.Dimensions[dim],
-                            MaximumItems = matrix.Dimensions[dim]
-                        };
-                    }
-                    else
-                    {
-                        outerSchema = new JSchema
-                        {
-                            Type = JSchemaType.Array,
-                            Items = { innerSchema },
-                            MinimumItems = matrix.Dimensions[dim],
-                            MaximumItems = matrix.Dimensions[dim]
-                        };
-                        innerSchema = outerSchema;
-                    }
-                }
-
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Integer });
                 return new UaValue(jArr, outerSchema);
             }
         }
@@ -217,14 +157,27 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jFloatVal = new JValue(float.Parse(value.Value.ToString()));
+                var jFloatVal = new JValue(value.Value);
                 var schema = schemaGenerator.Generate(typeof(float));
                 return new UaValue(jFloatVal, schema);
             }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
+                
+                return new UaValue(jArray, schema);
+            }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Number });
+                return new UaValue(jArr, outerSchema);
             }
         }
 
@@ -234,14 +187,27 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jDoubleVal = new JValue(double.Parse(value.Value.ToString()));
+                var jDoubleVal = new JValue(value.Value);
                 var schema = schemaGenerator.Generate(typeof(double));
                 return new UaValue(jDoubleVal, schema);
             }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
+                
+                return new UaValue(jArray, schema);
+            }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Number });
+                return new UaValue(jArr, outerSchema);
             }
         }
 
@@ -251,21 +217,34 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jStringVal = new JValue(value.Value.ToString());
+                var jStringVal = new JValue(value.Value);
                 var schema = schemaGenerator.Generate(typeof(string));
                 return new UaValue(jStringVal, schema);
             }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
+                
+                return new UaValue(jArray, schema);
+            }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String });
+                return new UaValue(jArr, outerSchema);
             }
         }
 
         private UaValue SerializeXmlElement(VariableNode variableNode, Variant value)
         {
             var schemaGenerator = new JSchemaGenerator();
-            //The stack is not able to handle xml elements. Bug maybe.
+            //TODO:The stack is not able to handle xml elements. Bug maybe.
             throw new NotImplementedException();
         }
 
@@ -279,71 +258,72 @@ namespace WebPlatform.OPCUALayer
                 var schema = schemaGenerator.Generate(typeof(string));
                 return new UaValue(jStringVal, schema);
             }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
+                
+                return new UaValue(jArray, schema);
+            }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String });
+                return new UaValue(jArr, outerSchema);
             }
         }
 
         private UaValue SerializeEnumeration(VariableNode variableNode, Variant value)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
-            LocalizedText[] enumString;
-            EnumValueType[] enumValues;
-
-            int enstrreturn = GetEnumStrings(variableNode.DataType, out enumString, out enumValues);
-            dynamic valueOut;
+            int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
+            
+            var innerSchema = new JSchema
+            {
+                Type = JSchemaType.Object,
+                Properties =
+                {
+                    { "EnumValue", new JSchema { Type = JSchemaType.Integer } },
+                    { "EnumLabel", new JSchema { Type = JSchemaType.String } }
+                }
+            };
+            
             if (variableNode.ValueRank == -1)
             {
-                int index = (int)value.Value;
-                if (enstrreturn < 0)
-                {
-                    var jsonResultEnumerationCustom = new
-                    {
-                        EnumValue = index,
-                        EnumLabel = ""
-                    };
-                    valueOut = JObject.FromObject(jsonResultEnumerationCustom);
-                }
-                else if (enstrreturn == 1)
-                {
-                    var jsonResultEnumerationCustom = new
-                    {
-                        EnumValue = index,
-                        EnumLabel = enumString[index].Text
-                    };
-                    valueOut = JObject.FromObject(jsonResultEnumerationCustom);
-                }
-                else
-                {
-                    var jsonResultEnumerationCustom = new
-                    {
-                        EnumValue = index,
-                        EnumLabel = enumValues.First(enumValue => enumValue.Value.Equals(index)).DisplayName.Text
-                    };
-                    valueOut = JObject.FromObject(jsonResultEnumerationCustom);
-                }
-                                
-                var schema = new JSchema
-                {
-                    Type = JSchemaType.Object,
-                    Properties =
-                    {
-                        { "EnumValue", new JSchema { Type = JSchemaType.Integer } },
-                        //TODO: sarebbe carino mettere Enum nel seguente schema con i valori di enumValues
-                        { "EnumLabel", new JSchema { Type = JSchemaType.String  } }
-                    }
-                };
-                return new UaValue(valueOut, schema);
+                var valueOut = GetEnumValue(value, enstrreturn, enumString, enumValues);
+                IEnumerable<JToken> listaenum = enumString.ToList().Select(x => new JValue(x.ToString()));
+
+                List<JToken> list = enumString.Select(val => new JValue(val.Text)).Cast<JToken>().ToList();
+                innerSchema.Enum.Add(list);
+                
+                return new UaValue(valueOut, innerSchema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)value.Value;
+                var jArray = new JArray(arr);
+                
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, innerSchema);
+                
+                return new UaValue(jArray, schema);
             }
             else
             {
-                //TODO: Gestire il caso degli array
-                throw new NotImplementedException();
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema);
+                return new UaValue(jArr, outerSchema);
             }
         }
+
+        
 
         private int GetEnumStrings(NodeId dataTypeNodeId, out LocalizedText[] enumStrings, out EnumValueType[] enumValues)
         {
@@ -421,6 +401,56 @@ namespace WebPlatform.OPCUALayer
                          );
 
             return dataValueCollection;
+        }
+        
+        private static dynamic GetEnumValue(Variant value, int enstrreturn, LocalizedText[] enumString,
+            EnumValueType[] enumValues)
+        {
+            dynamic valueOut;
+            int index = (int) value.Value;
+            if (enstrreturn < 0)
+            {
+                var jsonResultEnumerationCustom = new
+                {
+                    EnumValue = index,
+                    EnumLabel = ""
+                };
+                valueOut = JObject.FromObject(jsonResultEnumerationCustom);
+            }
+            else if (enstrreturn == 1)
+            {
+                var jsonResultEnumerationCustom = new
+                {
+                    EnumValue = index,
+                    EnumLabel = enumString[index].Text
+                };
+                valueOut = JObject.FromObject(jsonResultEnumerationCustom);
+            }
+            else
+            {
+                var jsonResultEnumerationCustom = new
+                {
+                    EnumValue = index,
+                    EnumLabel = enumValues.First(enumValue => enumValue.Value.Equals(index)).DisplayName.Text
+                };
+                valueOut = JObject.FromObject(jsonResultEnumerationCustom);
+            }
+
+            return valueOut;
+        }
+    }
+}
+
+namespace WebPlatform.Extensions
+{
+    public static class CollectionInitializerExtensionMethods
+    {
+        public static void Add(this IList<JToken> list, IList<JToken> toAdd)
+        {
+            foreach (var a in toAdd)
+            {
+                list.Add(a);
+            }
         }
     }
 }
