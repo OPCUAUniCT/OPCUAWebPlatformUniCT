@@ -291,15 +291,18 @@ namespace WebPlatform.OPCUALayer
                     { "EnumLabel", new JSchema { Type = JSchemaType.String } }
                 }
             };
+
+            if (enstrreturn == 1)
+            {
+                List<JToken> list = enumString.Select(val => new JValue(val.Text)).Cast<JToken>().ToList();
+                innerSchema.Properties["EnumLabel"].Enum.Add(list);
+            }
             
             if (variableNode.ValueRank == -1)
             {
                 var valueOut = GetEnumValue(value, enstrreturn, enumString, enumValues);
                 IEnumerable<JToken> listaenum = enumString.ToList().Select(x => new JValue(x.ToString()));
 
-                List<JToken> list = enumString.Select(val => new JValue(val.Text)).Cast<JToken>().ToList();
-                innerSchema.Enum.Add(list);
-                
                 return new UaValue(valueOut, innerSchema);
             }
             else if (variableNode.ValueRank == 1)
