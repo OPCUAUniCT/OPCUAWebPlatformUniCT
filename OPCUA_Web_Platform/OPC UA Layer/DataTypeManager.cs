@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
+using System.Text.RegularExpressions;
 using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -50,33 +51,27 @@ namespace WebPlatform.OPCUALayer
             {
                     case BuiltInType.Boolean:
                         return SerializeBoolean(variableNode, value);
-                        break;
                     case BuiltInType.SByte: case BuiltInType.Byte:
                     case BuiltInType.Int16: case BuiltInType.UInt16:
                     case BuiltInType.Int32: case BuiltInType.UInt32:
                     case BuiltInType.Int64: case BuiltInType.UInt64:
                         return SerializeInteger(variableNode, value);
-                        break;
                     case BuiltInType.Float:
                         return SerializeFloat(variableNode, value);
-                        break;
                     case BuiltInType.Double:
                         return SerializeDouble(variableNode, value);
-                        break;
                     case BuiltInType.String:         case BuiltInType.DateTime:      case BuiltInType.Guid:
                     case BuiltInType.DiagnosticInfo: case BuiltInType.NodeId:        case BuiltInType.ExpandedNodeId:
-                    case BuiltInType.StatusCode:     case BuiltInType.QualifiedName: case BuiltInType.LocalizedText:
+                    case BuiltInType.QualifiedName: case BuiltInType.LocalizedText:
                         return SerializeString(variableNode, value);
-                        break;
+                    case BuiltInType.StatusCode:
+                        return SerializeStatusCode(variableNode, value);
                     case BuiltInType.XmlElement:
                         return SerializeXmlElement(variableNode, value);
-                        break;
                     case BuiltInType.ByteString:
                         return SerializeByteString(variableNode, value);
-                        break;
                     case BuiltInType.Enumeration:
                         return SerializeEnumeration(variableNode, value);
-                        break;
                     case BuiltInType.ExtensionObject:
                         break;
             }
@@ -84,11 +79,6 @@ namespace WebPlatform.OPCUALayer
             return null;
         }
 
-        /// <summary>
-        /// Serialize a Variant value in JSON wrapped with its schema in a UaValue object.
-        /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
         private UaValue SerializeBoolean(VariableNode variableNode, Variant value)
         {
             var schemaGenerator = new JSchemaGenerator();
@@ -104,7 +94,7 @@ namespace WebPlatform.OPCUALayer
                
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Boolean });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.Boolean });
                 
                 return new UaValue(jArray, schema);
             }
@@ -135,7 +125,7 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Integer });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.Integer });
                 
                 return new UaValue(jArray, schema);
             }
@@ -165,7 +155,7 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
                 
                 return new UaValue(jArray, schema);
             }
@@ -195,7 +185,7 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.Number });
                 
                 return new UaValue(jArray, schema);
             }
@@ -225,7 +215,7 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
                 
                 return new UaValue(jArray, schema);
             }
@@ -237,6 +227,54 @@ namespace WebPlatform.OPCUALayer
                 var jArr = JArray.Parse(arrStr);
 
                 var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String });
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+        
+        private UaValue SerializeStatusCode(VariableNode variableNode, Variant value)
+        {
+            var innerSchema = new JSchema
+            {
+                Type = JSchemaType.Object,
+                Properties =
+                {
+                    { "code", new JSchema
+                        { 
+                            Type = JSchemaType.String, 
+                            Enum = { "Good", "Uncertain", "Bad" } 
+                        } 
+                    },
+                    { "structureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                }
+            };
+            
+            if (variableNode.ValueRank == -1)
+            {
+                var statusValue = new PlatformStatusCode((StatusCode)value.Value);
+                var jStringVal = JObject.FromObject(statusValue);
+
+                return new UaValue(jStringVal, innerSchema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)((StatusCode[]) value.Value).Select(val => JObject.FromObject(new PlatformStatusCode(val))).ToArray();
+
+                var jArray = new JArray(arr);
+                
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema);
+                
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                
+                var transformedArr = IterativeCopy<StatusCode, JObject>(arr, matrix.Dimensions, i => JObject.FromObject(new PlatformStatusCode(i)));
+                var arrStr = JsonConvert.SerializeObject(transformedArr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema);
                 return new UaValue(jArr, outerSchema);
             }
         }
@@ -262,7 +300,7 @@ namespace WebPlatform.OPCUALayer
             {
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.String });
                 
                 return new UaValue(jArray, schema);
             }
@@ -310,7 +348,7 @@ namespace WebPlatform.OPCUALayer
                 var arr = (Array)value.Value;
                 var jArray = new JArray(arr);
                 
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] {arr.Length}, innerSchema);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema);
                 
                 return new UaValue(jArray, schema);
             }
@@ -440,6 +478,89 @@ namespace WebPlatform.OPCUALayer
             }
 
             return valueOut;
+        }
+
+        //TODO: this method is a recursive alternative to IterativeCopy. Delete it.
+        private static void RecursiveCopy<TInput, TOutput>(
+            Array source,
+            Array destination,
+            int[] dimensions,
+            Func<TInput, TOutput> mutate,
+            int[] indexPrefix = null)
+        {
+            indexPrefix = indexPrefix ?? new int[0];
+            if (dimensions.Length != 1)
+            {
+                for (var i = 0; i < dimensions[0]; i++)
+                {
+                    var newDimensions = new int[dimensions.Length - 1];
+                    Array.Copy(dimensions, 1, newDimensions, 0, dimensions.Length - 1);
+    
+                    var newIndexPrefix = new int[indexPrefix.Length + 1];
+                    Array.Copy(indexPrefix, 0, newIndexPrefix, 0, indexPrefix.Length);
+                    newIndexPrefix[indexPrefix.Length] = i;
+    
+                    RecursiveCopy(source, destination, newDimensions, mutate, newIndexPrefix);
+                }
+            }
+            else
+            {
+                var currentIndex = new int[indexPrefix.Length + 1];
+                Array.Copy(indexPrefix, 0, currentIndex, 0, indexPrefix.Length);
+                for (var i = 0; i < dimensions[0]; i++)
+                {
+                    currentIndex[indexPrefix.Length] = i;
+                    var value = source.GetValue(currentIndex);
+                    if (value is TInput input)
+                    {
+                        var mutated = mutate(input);
+                        destination.SetValue(mutated, currentIndex);
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Different type. Expected " + nameof(TInput));
+                    }
+                }
+            }
+        }
+
+        private static Array IterativeCopy<TInput, TOutput>(Array source, int[] dimensions, Func<TInput, TOutput> mutate)
+        {
+            var array = Array.CreateInstance(typeof(TOutput), dimensions);
+            var flatSource = Utils.FlattenArray(source);
+            var indexes = new int[dimensions.Length];
+
+            for (var ii = 0; ii < flatSource.Length; ii++)
+            {
+                var mutated = mutate((TInput)flatSource.GetValue(ii));
+                array.SetValue(mutated, indexes);
+                
+                for (var jj = indexes.Length-1; jj >= 0; jj--)
+                {
+                    indexes[jj]++;
+                    
+                    if (indexes[jj] < dimensions[jj])
+                    {
+                        break;
+                    }
+
+                    indexes[jj] = 0;
+                }
+            }
+
+            return array;
+        }
+    }
+
+    internal class PlatformStatusCode
+    {
+        public readonly string code;
+        public readonly bool structureChanged;
+
+        public PlatformStatusCode(StatusCode statusCode)
+        {
+            code = Regex.Match(statusCode.ToString(), @"(Good|Uncertain|Bad)").Groups[1].ToString();
+            structureChanged = statusCode.StructureChanged;
         }
     }
 }
