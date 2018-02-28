@@ -1,17 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RootNamespace>WebPlatform</RootNamespace>
   </PropertyGroup>
-
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
     <ExternalConsole>false</ExternalConsole>
-    <EnvironmentVariables>
-      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
-      <Variable name="ASPNETCORE_ENVIRONMENT" value="Development" />
-    </EnvironmentVariables>
     <LaunchBrowser>false</LaunchBrowser>
     <LaunchUrl>api/values</LaunchUrl>
   </PropertyGroup>
@@ -20,18 +14,19 @@
     <Folder Include="Models\Auth\" />
     <Folder Include="Models\OptionsModels\" />
     <Folder Include="Auth\" />
+    <Folder Include="Models\OPCUA\" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
-    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.3.350.6" />
+    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.5" />
+    <PackageReference Include="Newtonsoft.Json.Schema" Version="3.0.7" />
+    <PackageReference Include="NJsonSchema" Version="9.10.27" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.3.351.7" />
   </ItemGroup>
-
   <ItemGroup>
     <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.0.0" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Remove="Models\AuthCredentials.cs" />
+    <Compile Remove="OPC UA Layer\EmptyClass.cs" />
   </ItemGroup>
 </Project>
