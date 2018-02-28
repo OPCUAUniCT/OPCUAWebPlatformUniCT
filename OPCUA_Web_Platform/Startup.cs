@@ -9,10 +9,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Microsoft.IdentityModel.Tokens;
 using WebPlatform.Auth;
 using WebPlatform.Models.OptionsModels;
 using WebPlatform.OPCUALayer;
+using WebPlatform.MVCBugFix;
 
 namespace WebPlatform
 {
@@ -66,6 +68,9 @@ namespace WebPlatform
             {
                 app.UseDeveloperExceptionPage();
             }
+
+            // Check for invalid HTTP requests before the MVC
+            app.UseRequestValidator();
 
             app.UseAuthentication();
 
