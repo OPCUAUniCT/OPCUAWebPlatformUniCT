@@ -62,10 +62,12 @@ namespace WebPlatform.OPCUALayer
                         return SerializeDouble(variableNode, value);
                     case BuiltInType.String:         case BuiltInType.DateTime:      case BuiltInType.Guid:
                     case BuiltInType.DiagnosticInfo: case BuiltInType.NodeId:        case BuiltInType.ExpandedNodeId:
-                    case BuiltInType.QualifiedName: case BuiltInType.LocalizedText:
+                    case BuiltInType.LocalizedText:
                         return SerializeString(variableNode, value);
                     case BuiltInType.StatusCode:
                         return SerializeStatusCode(variableNode, value);
+                    case BuiltInType.QualifiedName:
+                        return SerializeQualifiedName(variableNode, value);
                     case BuiltInType.XmlElement:
                         return SerializeXmlElement(variableNode, value);
                     case BuiltInType.ByteString:
@@ -271,6 +273,47 @@ namespace WebPlatform.OPCUALayer
                 var arr = matrix.ToArray();
                 
                 var transformedArr = IterativeCopy<StatusCode, JObject>(arr, matrix.Dimensions, i => JObject.FromObject(new PlatformStatusCode(i)));
+                var arrStr = JsonConvert.SerializeObject(transformedArr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema);
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+        
+        private UaValue SerializeQualifiedName(VariableNode variableNode, Variant value)
+        {
+            var innerSchema = new JSchema
+            {
+                Type = JSchemaType.Object,
+                Properties =
+                {
+                    { "NamespaceIndex", new JSchema{ Type = JSchemaType.Integer} },
+                    { "Name", new JSchema{ Type = JSchemaType.String } }
+                }
+            };
+            
+            if (variableNode.ValueRank == -1)
+            {
+                var jStringVal = JObject.FromObject((QualifiedName)value.Value);
+
+                return new UaValue(jStringVal, innerSchema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)((QualifiedName[]) value.Value).Select(JObject.FromObject).ToArray();
+                var jArray = new JArray(arr);
+                
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema);
+                
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                
+                var transformedArr = IterativeCopy<QualifiedName, JObject>(arr, matrix.Dimensions, JObject.FromObject);
                 var arrStr = JsonConvert.SerializeObject(transformedArr);
                 var jArr = JArray.Parse(arrStr);
 
