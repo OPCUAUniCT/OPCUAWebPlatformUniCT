@@ -50,33 +50,32 @@ namespace WebPlatform.OPCUALayer
             {
                     case BuiltInType.Boolean:
                         return SerializeBoolean(variableNode, value);
-                        break;
-                    case BuiltInType.SByte: case BuiltInType.Byte:
+                    case BuiltInType.SByte:
+                        return SerializeSByte(variableNode, value);
+                    case BuiltInType.Byte:
+                        return SerializeByte(variableNode, value);
                     case BuiltInType.Int16: case BuiltInType.UInt16:
                     case BuiltInType.Int32: case BuiltInType.UInt32:
                     case BuiltInType.Int64: case BuiltInType.UInt64:
                         return SerializeInteger(variableNode, value);
-                        break;
                     case BuiltInType.Float:
                         return SerializeFloat(variableNode, value);
-                        break;
                     case BuiltInType.Double:
                         return SerializeDouble(variableNode, value);
-                        break;
                     case BuiltInType.String:         case BuiltInType.DateTime:      case BuiltInType.Guid:
-                    case BuiltInType.DiagnosticInfo: case BuiltInType.NodeId:        case BuiltInType.ExpandedNodeId:
-                    case BuiltInType.StatusCode:     case BuiltInType.QualifiedName: case BuiltInType.LocalizedText:
+                    case BuiltInType.DiagnosticInfo: case BuiltInType.StatusCode:     case BuiltInType.QualifiedName:
+                    case BuiltInType.LocalizedText:
                         return SerializeString(variableNode, value);
-                        break;
+                    case BuiltInType.NodeId: 
+                        return SerializeNodeId(variableNode, value);
+                    case BuiltInType.ExpandedNodeId:
+                        return SerializeExpandedNodeId(variableNode, value);
                     case BuiltInType.XmlElement:
                         return SerializeXmlElement(variableNode, value);
-                        break;
                     case BuiltInType.ByteString:
                         return SerializeByteString(variableNode, value);
-                        break;
                     case BuiltInType.Enumeration:
                         return SerializeEnumeration(variableNode, value);
-                        break;
                     case BuiltInType.ExtensionObject:
                         break;
             }
@@ -147,6 +146,76 @@ namespace WebPlatform.OPCUALayer
                 var jArr = JArray.Parse(arrStr);
 
                 var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Integer });
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+
+        private UaValue SerializeByte(VariableNode variableNode, Variant value)
+        {
+            var schemaGenerator = new JSchemaGenerator();
+
+            if (variableNode.ValueRank == -1)
+            {
+                var jIntVal = new JValue(value.Value);
+                var schema = schemaGenerator.Generate(typeof(int));
+                return new UaValue(jIntVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {                
+                var bytes = (Byte[])value.Value;
+                int[] byteRepresentations = new int[bytes.Length];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    byteRepresentations[i] = Convert.ToInt32(bytes[i]);
+                }
+                var jArray = new JArray(byteRepresentations);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { bytes.Length }, new JSchema { Type = JSchemaType.String });
+
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.Integer });
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+
+        private UaValue SerializeSByte(VariableNode variableNode, Variant value)
+        {
+            var schemaGenerator = new JSchemaGenerator();
+
+            if (variableNode.ValueRank == -1)
+            {
+                var jIntVal = new JValue(value.Value);
+                var schema = schemaGenerator.Generate(typeof(int));
+                return new UaValue(jIntVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var bytes = (SByte[])value.Value;
+                int[] byteRepresentations = new int[bytes.Length];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    byteRepresentations[i] = Convert.ToInt32(bytes[i]);
+                }
+                var jArray = new JArray(byteRepresentations);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { bytes.Length }, new JSchema { Type = JSchemaType.String });
+
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema { Type = JSchemaType.Integer });
                 return new UaValue(jArr, outerSchema);
             }
         }
@@ -237,6 +306,121 @@ namespace WebPlatform.OPCUALayer
                 var jArr = JArray.Parse(arrStr);
 
                 var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String });
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+
+        private UaValue SerializeNodeId(VariableNode variableNode, Variant value)
+        {
+            var schemaGenerator = new JSchemaGenerator();
+
+            if (variableNode.ValueRank == -1)
+            {
+                NodeId nodeId = (NodeId)value.Value;
+                string nodeIdRepresentation = "";
+                if (nodeId.IdType == IdType.Opaque)
+                    nodeIdRepresentation = nodeId.NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeId.Identifier);
+                else
+                    nodeIdRepresentation = nodeId.NamespaceIndex + "-" + nodeId.Identifier.ToString();
+                var jStringVal = new JValue(nodeIdRepresentation);
+                var schema = schemaGenerator.Generate(typeof(string));
+                return new UaValue(jStringVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var nodeIds = (NodeId[])value.Value;
+                string[] nodeIdRepresentations = new string[nodeIds.Length];
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i].IdType == IdType.Opaque)
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeIds[i].Identifier, 0 , ((byte[])nodeIds[i].Identifier).Length);
+                    else
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + nodeIds[i].Identifier.ToString();
+                }
+                var jArray = new JArray(nodeIdRepresentations);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { nodeIds.Length }, new JSchema { Type = JSchemaType.String });
+
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                //la matrice ha un array lineare di tutti gli elementi. Lo prendo per ottenere tutti i valori della matrice
+                var nodeIds = (NodeId[])matrix.Elements;
+                //Creo un array uguale a quello sopra e metto la stringa corrispondente in ogni valore
+                string[] nodeIdRepresentations = new string[nodeIds.Length];
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i].IdType == IdType.Opaque)
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeIds[i].Identifier, 0, ((byte[])nodeIds[i].Identifier).Length);
+                    else
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + nodeIds[i].Identifier.ToString();
+                }
+                //Creo una nuova matrice con dimensioni uguali, di tipo stringa e con i valori che voglio (quelli in nodeIdRepresentations
+                var arr = (new Matrix(nodeIdRepresentations,BuiltInType.String, matrix.Dimensions)).ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema { Type = JSchemaType.String });
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+
+
+        //Warning: bisogna gestire gli ExpandedNodeId quando absolute = true
+        //Guardare https://github.com/OPCFoundation/UA-.NETStandard/issues/369#issuecomment-367991465
+        private UaValue SerializeExpandedNodeId(VariableNode variableNode, Variant value)
+        {
+            var schemaGenerator = new JSchemaGenerator();
+
+            if (variableNode.ValueRank == -1)
+            {
+                ExpandedNodeId nodeId = (ExpandedNodeId)value.Value;
+                string nodeIdRepresentation = "";
+                if (nodeId.IdType == IdType.Opaque)
+                    nodeIdRepresentation = nodeId.NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeId.Identifier);
+                else
+                    nodeIdRepresentation = nodeId.NamespaceIndex + "-" + nodeId.Identifier.ToString();
+                var jStringVal = new JValue(nodeIdRepresentation);
+                var schema = schemaGenerator.Generate(typeof(string));
+                return new UaValue(jStringVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var nodeIds = (ExpandedNodeId[])value.Value;
+                string[] nodeIdRepresentations = new string[nodeIds.Length];
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i].IdType == IdType.Opaque)
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeIds[i].Identifier, 0, ((byte[])nodeIds[i].Identifier).Length);
+                    else
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + nodeIds[i].Identifier.ToString();
+                }
+                var jArray = new JArray(nodeIdRepresentations);
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { nodeIds.Length }, new JSchema { Type = JSchemaType.String });
+
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                //la matrice ha un array lineare di tutti gli elementi. Lo prendo per ottenere tutti i valori della matrice
+                var nodeIds = (ExpandedNodeId[])matrix.Elements;
+                //Creo un array uguale a quello sopra e metto la stringa corrispondente in ogni valore
+                string[] nodeIdRepresentations = new string[nodeIds.Length];
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i].IdType == IdType.Opaque)
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + Convert.ToBase64String((byte[])nodeIds[i].Identifier, 0, ((byte[])nodeIds[i].Identifier).Length);
+                    else
+                        nodeIdRepresentations[i] = nodeIds[i].NamespaceIndex + "-" + nodeIds[i].Identifier.ToString();
+                }
+                //Creo una nuova matrice con dimensioni uguali, di tipo stringa e con i valori che voglio (quelli in nodeIdRepresentations
+                var arr = (new Matrix(nodeIdRepresentations, BuiltInType.String, matrix.Dimensions)).ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema { Type = JSchemaType.String });
                 return new UaValue(jArr, outerSchema);
             }
         }
