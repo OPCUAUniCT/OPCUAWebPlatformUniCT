@@ -64,8 +64,9 @@ namespace WebPlatform.OPCUALayer
                         return SerializeDouble(variableNode, value);
                     case BuiltInType.String:         case BuiltInType.DateTime:      case BuiltInType.Guid:
                     case BuiltInType.DiagnosticInfo: case BuiltInType.StatusCode:     case BuiltInType.QualifiedName:
-                    case BuiltInType.LocalizedText:
                         return SerializeString(variableNode, value);
+                    case BuiltInType.LocalizedText:
+                        return SerializeLocalizedText(variableNode, value);
                     case BuiltInType.NodeId: 
                         return SerializeNodeId(variableNode, value);
                     case BuiltInType.ExpandedNodeId:
@@ -345,9 +346,7 @@ namespace WebPlatform.OPCUALayer
             else
             {
                 var matrix = (Matrix)value.Value;
-                //la matrice ha un array lineare di tutti gli elementi. Lo prendo per ottenere tutti i valori della matrice
                 var nodeIds = (NodeId[])matrix.Elements;
-                //Creo un array uguale a quello sopra e metto la stringa corrispondente in ogni valore
                 string[] nodeIdRepresentations = new string[nodeIds.Length];
                 for (int i = 0; i < nodeIds.Length; i++)
                 {
@@ -366,6 +365,85 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
+        private UaValue SerializeLocalizedText(VariableNode variableNode, Variant value)
+        {
+            var schemaGenerator = new JSchemaGenerator();
+
+            if (variableNode.ValueRank == -1)
+            {
+                LocalizedText locText = (LocalizedText)value.Value;
+                var loctext = new
+                {
+                    locText.Locale,
+                    locText.Text
+                };
+                var jStringVal = JObject.Parse(JsonConvert.SerializeObject(loctext));
+                
+                var schema = new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Properties = {
+                        { "Locale", new JSchema { Type = JSchemaType.String } },
+                        { "Text", new JSchema { Type = JSchemaType.String } }
+                    }
+            };
+                return new UaValue(jStringVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var jArray = new JArray();
+                
+                var locText = (LocalizedText[])value.Value;
+                for (int i = 0; i < locText.Length; i++)
+                {
+                    jArray.Add(JObject.Parse(JsonConvert.SerializeObject(new
+                    {
+                        locText[i].Locale,
+                        locText[i].Text
+                    })));
+                }
+                
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { locText.Length }, new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Properties = {
+                        { "Locale", new JSchema { Type = JSchemaType.String } },
+                        { "Text", new JSchema { Type = JSchemaType.String } }
+                    }
+                });
+
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var locTexts = (LocalizedText[])matrix.Elements;
+                var locTextsRepresentation = new dynamic[matrix.Elements.Length];
+                for (int i = 0; i < locTexts.Length; i++)
+                {
+                    locTextsRepresentation[i] = new
+                    {
+                        locTexts[i].Locale,
+                        locTexts[i].Text
+                    };
+                }
+
+                var arr = (new Matrix(locTextsRepresentation, BuiltInType.ExtensionObject, matrix.Dimensions)).ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Properties = {
+                        { "Locale", new JSchema { Type = JSchemaType.String } },
+                        { "Text", new JSchema { Type = JSchemaType.String } }
+                    }
+                });
+
+                return new UaValue(jArr, outerSchema);
+            }
+        }
 
         //Warning: bisogna gestire gli ExpandedNodeId quando absolute = true
         //Guardare https://github.com/OPCFoundation/UA-.NETStandard/issues/369#issuecomment-367991465
