@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Schema;
+using NJsonSchema;
 using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Models.DataSet;
