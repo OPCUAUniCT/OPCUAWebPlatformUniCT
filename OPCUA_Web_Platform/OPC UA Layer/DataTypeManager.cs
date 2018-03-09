@@ -83,6 +83,7 @@ namespace WebPlatform.OPCUALayer
                     case BuiltInType.Enumeration:
                         return SerializeEnumeration(variableNode, value);
                     case BuiltInType.ExtensionObject:
+                        return SerializeExtensionObject(variableNode, value);
                         break;
             }
 
@@ -677,7 +678,75 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
-        
+        private UaValue SerializeExtensionObject(VariableNode variableNode, Variant value)
+        {
+            /*var innerSchema = new JSchema
+            {
+                Type = JSchemaType.Object,
+                Properties =
+                {
+                    { "code", new JSchema
+                        { 
+                            Type = JSchemaType.String, 
+                            Enum = { "Good", "Uncertain", "Bad" } 
+                        } 
+                    },
+                    { "structureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                }
+            };*/
+            
+            if (variableNode.ValueRank == -1)
+            {
+                //Check if it is not a Type of the standard information model
+                if (variableNode.DataType.NamespaceIndex != 0)
+                {
+                    var analyzer = new DataTypeAnalyzer(m_session);
+                    var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
+                    var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                    //TODO: A cache for the dictionary could be implemented in order to improve performances
+                    string dictionary = analyzer.GetDictionary(descriptionNodeId);
+                    
+                    //Retrieve a key that will be used by the Parser. As explained in the specification Part 3, 
+                    //the value of DataTypeDescription variable contains the description identifier in the 
+                    //DataTypeDictionary value which describe the data structure.
+                    string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+                    
+                    //Start parsing
+                    ParserXPath parser = new ParserXPath(dictionary);
+                    var valueOut = JObject.Parse(parser.Parse(descriptionId, (ExtensionObject) value.Value, m_session.MessageContext));
+
+                    return new UaValue(valueOut, null);
+                }
+                
+                var statusValue = new PlatformStatusCode((StatusCode)value.Value);
+                var jStringVal = JObject.FromObject(statusValue);
+
+                return new UaValue(jStringVal, null);
+            }
+            return null;
+            /*else if (variableNode.ValueRank == 1)
+            {
+                var arr = (Array)((StatusCode[]) value.Value).Select(val => JObject.FromObject(new PlatformStatusCode(val))).ToArray();
+
+                var jArray = new JArray(arr);
+                
+                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema);
+                
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var arr = matrix.ToArray();
+                
+                var transformedArr = IterativeCopy<StatusCode, JObject>(arr, matrix.Dimensions, i => JObject.FromObject(new PlatformStatusCode(i)));
+                var arrStr = JsonConvert.SerializeObject(transformedArr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema);
+                return new UaValue(jArr, outerSchema);
+            }*/
+        }
 
         private int GetEnumStrings(NodeId dataTypeNodeId, out LocalizedText[] enumStrings, out EnumValueType[] enumValues)
         {
