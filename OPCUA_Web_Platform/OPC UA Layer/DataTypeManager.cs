@@ -696,39 +696,56 @@ namespace WebPlatform.OPCUALayer
                     string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
                     
                     //Start parsing
-                    ParserXPath parser = new ParserXPath(dictionary);
+                    var parser = new ParserXPath(dictionary);
                     
                     return parser.Parse(descriptionId, (ExtensionObject) value.Value, m_session.MessageContext);
                 }
                 
-                var statusValue = new PlatformStatusCode((StatusCode)value.Value);
-                var jStringVal = JObject.FromObject(statusValue);
-
-                return new UaValue(jStringVal, null);
+                var structStandard = ((ExtensionObject)value.Value).Body;
+                var jValue = JObject.FromObject(structStandard);
+                var schema4 = JsonSchema4.FromSampleJson(jValue.ToString());
+                var jSchema = JSchema.Parse(schema4.ToJson());
+                return new UaValue(jValue, jSchema);
             }
-            return null;
-            /*else if (variableNode.ValueRank == 1)
+            else if (variableNode.ValueRank == 1)
             {
-                var arr = (Array)((StatusCode[]) value.Value).Select(val => JObject.FromObject(new PlatformStatusCode(val))).ToArray();
+                if (variableNode.DataType.NamespaceIndex != 0)
+                {
+                    var analyzer = new DataTypeAnalyzer(m_session);
+                    var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
+                    var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                    //TODO: A cache for the dictionary could be implemented in order to improve performances
+                    string dictionary = analyzer.GetDictionary(descriptionNodeId);
+                    
+                    string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+                    
+                    var parser = new ParserXPath(dictionary);
+                    var jArray = new JArray();
+                    var arrayValue = (Array)value.Value;
 
-                var jArray = new JArray(arr);
-                
-                var schema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema);
-                
-                return new UaValue(jArray, schema);
+                    var uaValue = new UaValue();
+                    
+                    foreach(var x in arrayValue)
+                    {
+                        uaValue = parser.Parse(descriptionId, (ExtensionObject) x, m_session.MessageContext);
+                        jArray.Add(uaValue.Value);
+                    }
+                    var jSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[]{arrayValue.Length}, uaValue.Schema);
+                    return new UaValue(jArray, jSchema);
+                }
+                else
+                {
+                    var structArray = ((ExtensionObject[])value.Value);
+                    var jArray = JArray.FromObject(structArray);
+                    var schema4 = JsonSchema4.FromSampleJson(jArray.ToString());
+                    var jSchema = JSchema.Parse(schema4.ToJson());
+                    return new UaValue(jArray, jSchema);
+                }
             }
             else
             {
-                var matrix = (Matrix)value.Value;
-                var arr = matrix.ToArray();
-                
-                var transformedArr = IterativeCopy<StatusCode, JObject>(arr, matrix.Dimensions, i => JObject.FromObject(new PlatformStatusCode(i)));
-                var arrStr = JsonConvert.SerializeObject(transformedArr);
-                var jArr = JArray.Parse(arrStr);
-
-                var outerSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema);
-                return new UaValue(jArr, outerSchema);
-            }*/
+                throw new NotImplementedException();
+            }
         }
 
         private int GetEnumStrings(NodeId dataTypeNodeId, out LocalizedText[] enumStrings, out EnumValueType[] enumValues)
