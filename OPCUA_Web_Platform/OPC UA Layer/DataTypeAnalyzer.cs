@@ -12,6 +12,47 @@ namespace WebPlatform.OPCUALayer
         {
             this.m_session = session;
         }
+
+        public static BuiltInType GetBuiltinTypeFromStandardTypeDescription(string type)
+        {
+            switch (type)
+            {
+                case "Bit": case "Boolean":
+                    return BuiltInType.Boolean;
+                case "SByte":
+                    return BuiltInType.SByte;
+                case "Byte":
+                    return BuiltInType.Byte;
+                case "Int16":
+                    return BuiltInType.Int16;
+                case "UInt16":
+                    return BuiltInType.UInt16;
+                case "Int32":
+                    return BuiltInType.Int32;
+                case "UInt32":
+                    return BuiltInType.UInt32;
+                case "Int64":
+                    return BuiltInType.Int64;
+                case "UInt64":
+                    return BuiltInType.UInt64;
+                case "Float":
+                    return BuiltInType.Float;
+                case "Double":
+                    return BuiltInType.Double;
+                case "Char": case "WideChar": 
+                case "String": case "CharArray":
+                case "WideString": case "WideCharArray":
+                    return BuiltInType.String;
+                case "DateTime":
+                    return BuiltInType.DateTime;
+                case "ByteString":
+                    return BuiltInType.ByteString;
+                case "Guid":
+                    return BuiltInType.Guid;
+                default:
+                    return BuiltInType.Null;
+            }
+        }
         
         internal NodeId GetDataTypeEncodingNodeId(NodeId dataTypeNodeId)
         {

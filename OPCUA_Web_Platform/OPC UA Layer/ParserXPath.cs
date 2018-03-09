@@ -6,7 +6,9 @@ using System.Xml;
 using System.Xml.XPath;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Schema;
 using Opc.Ua;
+using WebPlatform.Models.OPCUA;
 using Formatting = Newtonsoft.Json.Formatting;
 
 namespace WebPlatform.OPCUALayer
@@ -42,7 +44,7 @@ namespace WebPlatform.OPCUALayer
         /// <param name="extensionObject"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        public String Parse(string descriptionId, ExtensionObject extensionObject, ServiceMessageContext context)
+        public UaValue Parse(string descriptionId, ExtensionObject extensionObject, ServiceMessageContext context)
         {
             _bd = new BinaryDecoder((byte[])extensionObject.Body, context);
             
@@ -51,7 +53,8 @@ namespace WebPlatform.OPCUALayer
                 Formatting = Formatting.Indented
             };
 
-            return JsonConvert.SerializeObject(BuildJsonForObject(descriptionId), serializerSettings);
+            //return JsonConvert.SerializeObject(BuildJsonForObject(descriptionId), serializerSettings);
+            return BuildJsonForObject(descriptionId);
         }
 
         /// <summary>
@@ -59,9 +62,10 @@ namespace WebPlatform.OPCUALayer
         /// </summary>
         /// <param name="descriptionId"></param>
         /// <returns></returns>
-        private JToken BuildJsonForObject(string descriptionId)
+        private UaValue BuildJsonForObject(string descriptionId)
         {
             var complexObj = new JObject();
+            var complexSchema = new JSchema { Type = JSchemaType.Object };
 
             XPathNodeIterator iterator = _nav.Select($"/opc:TypeDictionary/opc:StructuredType[@Name='{descriptionId}']", _ns);
 
@@ -80,17 +84,21 @@ namespace WebPlatform.OPCUALayer
 
                         if (!(type.Contains("opc:") || type.Contains("ua:")))
                         {
-                            complexObj[fieldName] = BuildInnerComplex(type.Split(':')[1], l);
+                            var uaValue = BuildInnerComplex(type.Split(':')[1], l);
+                            complexObj[fieldName] = uaValue.Value;
+                            complexSchema.Properties.Add(fieldName, uaValue.Schema);
                         }
                         else
                         {
-                            complexObj[fieldName] = BuildSimple(type.Split(':')[1], l);
+                            var uaValue = BuildSimple(type.Split(':')[1], l);
+                            complexObj[fieldName] = uaValue.Value;
+                            complexSchema.Properties.Add(fieldName, uaValue.Schema);
                         }
                     }
                 }
             }
 
-            return complexObj;
+            return new UaValue(complexObj, complexSchema);
         }
 
         private int LengthField(string lengthFieldSource, JToken currentJson)
@@ -101,32 +109,45 @@ namespace WebPlatform.OPCUALayer
 
         }
         
-        private JToken BuildSimple(string type, int length)
+        private UaValue BuildSimple(string type, int length)
         {
-            if (length == 1) return JToken.FromObject(ReadBuiltinValue(type));
+            var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromStandardTypeDescription(type);
+            var jSchema = DataTypeSchemaGenerator.GenerateSchemaForStandardTypeDescription(builtinType);
+            
+            if (length == 1)
+            {
+                var jValue = JToken.FromObject(ReadBuiltinValue(builtinType));
+                return new UaValue(jValue, jSchema);
+            }
             
             var a = new List<object>();
 
             for (int i = 0; i < length; i++)
             {
-                a.Add(ReadBuiltinValue(type));
+                a.Add(ReadBuiltinValue(builtinType));
             }
+
+            var arrSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, jSchema);
             
-            return JToken.FromObject(a);
+            return new UaValue(JToken.FromObject(a), arrSchema);
         }
 
-        private JToken BuildInnerComplex(string description, int length)
+        private UaValue BuildInnerComplex(string description, int length)
         {
             if (length == 1) return BuildJsonForObject(description);
             
             var jArray = new JArray();
+            UaValue uaVal = new UaValue();
             
             for (int i = 0; i < length; i++)
             {
-                jArray.Insert(i, BuildJsonForObject(description));
+                uaVal = BuildJsonForObject(description);
+                jArray.Insert(i, uaVal.Value);
             }
 
-            return jArray;
+            var jSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, uaVal.Schema);
+
+            return new UaValue(jArray, jSchema);
         }
         
         /// <summary>
@@ -134,13 +155,9 @@ namespace WebPlatform.OPCUALayer
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private Object ReadBuiltinValue(string type)
+        private Object ReadBuiltinValue(BuiltInType builtinType)
         {
-            if (type.Equals("CharArray"))
-                type = "String";
-
-
-            var methodToCall = "Read" + type;
+            var methodToCall = "Read" + builtinType;
             MethodInfo mInfo = typeof(BinaryDecoder).GetMethod(methodToCall, new[] { typeof(string) });
 
             return mInfo.Invoke(_bd, new object[] { "" });

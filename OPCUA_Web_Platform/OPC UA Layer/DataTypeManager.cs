@@ -24,7 +24,7 @@ namespace WebPlatform.OPCUALayer
         {
             m_session = session;
         }
-
+        
         public UaValue GetUaValue(VariableNode variableNode)
         {
             #region local variables
@@ -84,7 +84,6 @@ namespace WebPlatform.OPCUALayer
                         return SerializeEnumeration(variableNode, value);
                     case BuiltInType.ExtensionObject:
                         return SerializeExtensionObject(variableNode, value);
-                        break;
             }
 
             return null;
@@ -476,7 +475,7 @@ namespace WebPlatform.OPCUALayer
                         { "Locale", new JSchema { Type = JSchemaType.String } },
                         { "Text", new JSchema { Type = JSchemaType.String } }
                     }
-            };
+                };
                 return new UaValue(jStringVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -680,21 +679,6 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeExtensionObject(VariableNode variableNode, Variant value)
         {
-            /*var innerSchema = new JSchema
-            {
-                Type = JSchemaType.Object,
-                Properties =
-                {
-                    { "code", new JSchema
-                        { 
-                            Type = JSchemaType.String, 
-                            Enum = { "Good", "Uncertain", "Bad" } 
-                        } 
-                    },
-                    { "structureChanged", new JSchema{ Type = JSchemaType.Boolean } }
-                }
-            };*/
-            
             if (variableNode.ValueRank == -1)
             {
                 //Check if it is not a Type of the standard information model
@@ -713,9 +697,8 @@ namespace WebPlatform.OPCUALayer
                     
                     //Start parsing
                     ParserXPath parser = new ParserXPath(dictionary);
-                    var valueOut = JObject.Parse(parser.Parse(descriptionId, (ExtensionObject) value.Value, m_session.MessageContext));
-
-                    return new UaValue(valueOut, null);
+                    
+                    return parser.Parse(descriptionId, (ExtensionObject) value.Value, m_session.MessageContext);
                 }
                 
                 var statusValue = new PlatformStatusCode((StatusCode)value.Value);

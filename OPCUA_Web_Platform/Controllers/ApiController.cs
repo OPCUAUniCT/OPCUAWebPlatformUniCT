@@ -78,10 +78,7 @@ namespace WebPlatform.Controllers
                     var varNode = (VariableNode) sourceNode;
                     var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
                     result["value"] = uaValue.Value;
-                    //result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
-                    //TODO: le due righe successive sono una prova da eliminare
-                    var schema4 = JsonSchema4.FromSampleJson(uaValue.Value.ToString());
-                    result["value-schema"] = JObject.Parse(schema4.ToJson());
+                    result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
                     break;
                 case NodeClass.Object:
                     result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
