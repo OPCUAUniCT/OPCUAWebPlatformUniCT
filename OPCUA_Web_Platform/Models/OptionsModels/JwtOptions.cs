@@ -11,5 +11,6 @@ namespace WebPlatform.Models.OptionsModels
         public string Audience { get; set; }
         public string SecurityKey { get; set; }
         public int DurationMinutes { get; set; }
+        public int RefreshTime { get; set; }
     }
 }

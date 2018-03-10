@@ -13,7 +13,6 @@
     <Folder Include="wwwroot\" />
     <Folder Include="Models\Auth\" />
     <Folder Include="Models\OptionsModels\" />
-    <Folder Include="Auth\" />
     <Folder Include="Models\OPCUA\" />
   </ItemGroup>
   <ItemGroup>
