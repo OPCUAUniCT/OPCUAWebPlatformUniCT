@@ -73,8 +73,10 @@ namespace WebPlatform
             app.UseRequestValidator();
 
             app.UseAuthentication();
-
+            app.UseRefreshToken();
+            
             app.UseMvc();
+
         }
     }
 }
