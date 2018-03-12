@@ -6,6 +6,7 @@ using WebPlatform.Extensions;
 using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Models.OPCUA;
+using WebPlatform.Exceptions;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -16,9 +17,10 @@ namespace WebPlatform.OPCUALayer
         Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
+        Task<bool> isServerAvailable(string serverUrlstring);
     }
 
-    public interface IUAClientSingleton : IUAClient {}
+    public interface IUAClientSingleton : IUAClient { }
 
     public class UAClient : IUAClientSingleton
     {
@@ -51,26 +53,41 @@ namespace WebPlatform.OPCUALayer
             this._sessions = new Dictionary<string, Session>();
         }
 
-        public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr) 
+        public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
-			NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
+            NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
+            Node node;
+            try
+            {
+                node = session.ReadNode(nodeToRead);
+            }
+            catch (ServiceResultException)
+            {
+                throw new DataSetNotAvailableException();
+            }
+            return node;
+        }
 
-            return session.ReadNode(nodeToRead);
-        }
-        
-        public async Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeToRead) 
+        public async Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeToRead)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
-            
-            return session.ReadNode(nodeToRead);
+            Node node;
+            try {
+                node = session.ReadNode(nodeToRead);
+            }
+            catch (ServiceResultException)
+            {
+                throw new DataSetNotAvailableException();
+            }
+            return node;
         }
-        
+
         public async Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
             NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeToBrowseIdStr);
-            
+
             var browser = new Browser(session)
             {
                 NodeClassMask = 0,
@@ -90,7 +107,7 @@ namespace WebPlatform.OPCUALayer
             //Set a Browser object to follow HasTypeDefinition Reference only
             var browser = new Browser(session)
             {
-                ResultMask = (uint) BrowseResultMask.DisplayName | (uint) BrowseResultMask.TargetInfo,
+                ResultMask = (uint)BrowseResultMask.DisplayName | (uint)BrowseResultMask.TargetInfo,
                 BrowseDirection = BrowseDirection.Forward,
                 ReferenceTypeId = ReferenceTypeIds.HasTypeDefinition
             };
@@ -120,7 +137,48 @@ namespace WebPlatform.OPCUALayer
 
             return typeManager.GetUaValue(variableNode);
         }
-        
+
+        public async Task<bool> isServerAvailable(string serverUrlstring)
+        {
+            Session session;
+            if (!_sessions.ContainsKey(serverUrlstring))
+            {
+                var endpoints = new List<Endpoint>();
+                var endpoint_id = 0;
+                try
+                {
+                    foreach (EndpointDescription s in GetEndpointNames(new Uri(serverUrlstring)))
+                    {
+                        endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
+                        endpoint_id++;
+                    }
+                }
+                catch (Exception exc)
+                {
+                    return false;
+                }
+                //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
+                #warning Indice fisso a 0
+                await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
+            }
+
+            session = _sessions[serverUrlstring];
+            DataValue serverStatus;
+            try
+            {
+                serverStatus = session.ReadValue(new NodeId(2259, 0));
+            }
+            catch (Exception exc)
+            {
+                return await RestoreSessionAsync(serverUrlstring);
+            }
+            //If StatusCode of the Variable read is not Good or if the Value is not equal to Running (0)
+            //the OPC UA Server is not available
+            if (DataValue.IsNotGood(serverStatus) || (int)serverStatus.Value != 0)
+                return false;
+            return true;
+        }
+
         /*//TODO: sposta la funzione sotto tra le private
         private DataValueCollection ReadDataValue(Session session, NodeId nodeId)
         {
@@ -129,23 +187,61 @@ namespace WebPlatform.OPCUALayer
 
         #region private methods
 
-        private async Task<Session> GetSessionByUrlAsync(string url)
+            /// <summary>
+            /// This method is called when a OPC UA Service call in a session object returns an error 
+            /// </summary>
+            /// <param name="serverUrlstring"></param>
+            /// <returns></returns>
+            private async Task<bool> RestoreSessionAsync(string serverUrlstring)
         {
-            if (_sessions.ContainsKey(url))
-                return _sessions[url];
-            else
+            _sessions.Remove(serverUrlstring);
+            var endpoints = new List<Endpoint>();
+            var endpoint_id = 0;
+            try
             {
-                var endpoints = new List<Endpoint>();
-                var endpoint_id = 0;
-                foreach (EndpointDescription s in GetEndpointNames(new Uri(url)))
+                foreach (EndpointDescription s in GetEndpointNames(new Uri(serverUrlstring)))
                 {
                     endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
                     endpoint_id++;
                 }
+                await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
+            }
+            catch (Exception exc)
+            {
+                return false;
+            }
+            return true;
+        }
 
+        private async Task<Session> GetSessionByUrlAsync(string url)
+        {
+            if (_sessions.ContainsKey(url))
+                return _sessions[url];
+
+            else
+            {
+                var endpoints = new List<Endpoint>();
+                var endpoint_id = 0;
+                try
+                {
+                    foreach (EndpointDescription s in GetEndpointNames(new Uri(url)))
+                    {
+                        endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
+                        endpoint_id++;
+                    }
+                }
+                catch (ServiceResultException exc)
+                {
+                    switch (exc.StatusCode)
+                    {
+                        case (StatusCodes.BadNotConnected):
+                            throw new DataSetNotAvailableException();
+                    }
+                }
                 //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
                 #warning Indice fisso a 0
                 return await CreateSessionAsync(url, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
+
             }
         }
 
@@ -231,36 +327,34 @@ namespace WebPlatform.OPCUALayer
             EndpointConfiguration configuration = EndpointConfiguration.Create(_appConfiguration);
             configuration.OperationTimeout = 10;
 
-            using (DiscoveryClient client = DiscoveryClient.Create(serverURI,EndpointConfiguration.Create(_appConfiguration)))
+            using (DiscoveryClient client = DiscoveryClient.Create(serverURI, EndpointConfiguration.Create(_appConfiguration)))
             {
                 try
                 {
                     EndpointDescriptionCollection endpoints = client.GetEndpoints(null);
                     return endpoints;
                 }
-                catch (Exception e)
+                catch (ServiceResultException exc)
                 {
-                    Console.WriteLine("Could not fetch endpoints from url: {0}", serverURI);
-                    Console.WriteLine("Reason = {0}", e.Message);
-                    throw e;
+                    throw exc;
                 }
             }
         }
 
         private NodeId ParsePlatformNodeIdString(string str)
-		{
-			const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
-			var match = Regex.Match(str, pattern);
-			var isString = match.Groups[3].Length != 0;
-			var isNumeric = match.Groups[2].Length != 0;
-			
-			var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
-			var builtStr = $"ns={match.Groups[1]};" + idStr;
-			
+        {
+            const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
+            var match = Regex.Match(str, pattern);
+            var isString = match.Groups[3].Length != 0;
+            var isNumeric = match.Groups[2].Length != 0;
+
+            var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
+            var builtStr = $"ns={match.Groups[1]};" + idStr;
+
             return new NodeId(builtStr);
-		}
-        
-        
+        }
+
+
         #endregion
 
     }

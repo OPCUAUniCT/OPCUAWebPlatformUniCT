@@ -12,6 +12,7 @@ using Opc.Ua.Client;
 using WebPlatform.Models.DataSet;
 using WebPlatform.Models.OptionsModels;
 using WebPlatform.OPCUALayer;
+using WebPlatform.Exceptions;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -42,7 +43,11 @@ namespace WebPlatform.Controllers
         public async Task<IActionResult> GetNode(int ds_id, string node_id = "0-85")
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            
             var serverUrl = _UAServers[ds_id].Url;
+            if (!(await _UAClient.isServerAvailable(serverUrl)))
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+
             var decodedNodeId = WebUtility.UrlDecode(node_id);
             
             Node sourceNode;
@@ -59,8 +64,12 @@ namespace WebPlatform.Controllers
                     case StatusCodes.BadNodeIdInvalid:
                         return BadRequest("Provided Node Id is invalid");
                     default:
-                        throw exc;
+                        return StatusCode(500, exc.Message);
                 }
+            }
+            catch(DataSetNotAvailableException exc)
+            {
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
             }
 
             JObject result = new JObject();
