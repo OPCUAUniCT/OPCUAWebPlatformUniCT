@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using WebPlatform.Extensions;
@@ -7,6 +8,7 @@ using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
+using WebPlatform.Monitoring;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -18,6 +20,7 @@ namespace WebPlatform.OPCUALayer
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
         Task<bool> isServerAvailable(string serverUrlstring);
+        Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
     }
 
     public interface IUAClientSingleton : IUAClient { }
@@ -27,6 +30,8 @@ namespace WebPlatform.OPCUALayer
         private ApplicationConfiguration _appConfiguration { get; }
         //A Dictionary containing al the activ Sessions, indexed per server Id.
         private Dictionary<string, Session> _sessions;
+        
+        private Dictionary<string, List<MonitorPublishInfo>> _monitorPublishInfo;
 
         private struct Endpoint
         {
@@ -51,6 +56,7 @@ namespace WebPlatform.OPCUALayer
         {
             this._appConfiguration = CreateAppConfiguration("OPCUAWebPlatform", 60000);
             this._sessions = new Dictionary<string, Session>();
+            this._monitorPublishInfo = new Dictionary<string, List<MonitorPublishInfo>>();
         }
 
         public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
@@ -178,12 +184,121 @@ namespace WebPlatform.OPCUALayer
                 return false;
             return true;
         }
-
-        /*//TODO: sposta la funzione sotto tra le private
-        private DataValueCollection ReadDataValue(Session session, NodeId nodeId)
+        
+        public async Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
+            string brokerUrl, string topic)
         {
-            ReadValueIdCollection nodeToRead 
-        }*/
+            Session session = await GetSessionByUrlAsync(serverUrl);
+            
+            MonitoredItem mi = null;
+            MonitorPublishInfo monitorInfo = null;
+
+            const string pattern = @"^(mqtt|signalr):(.*)$";
+            var match = Regex.Match(brokerUrl, pattern);
+            var protocol = match.Groups[1].Value;
+            var url = match.Groups[2].Value;
+            
+            var publisher = PublisherFactory.GetPublisherForProtocol(protocol, url);
+            
+            //Set publishInterval to minimum samplinginterval
+            var publishInterval = monitorableNodes.Select(elem => elem.SamplingInterval).Min();
+
+            //Check if a Subscription for the
+            if (_monitorPublishInfo.ContainsKey(serverUrl))
+            {
+                monitorInfo = _monitorPublishInfo[serverUrl].FirstOrDefault(info => info.Topic == topic && info.BrokerUrl == url);
+                if (monitorInfo == null)
+                {
+                    monitorInfo = new MonitorPublishInfo()
+                    {
+                        Topic = topic,
+                        BrokerUrl = url,
+                        Subscription = CreateSubscription(serverUrl, session, publishInterval, 0),
+                        Publisher = publisher
+                    };
+                    _monitorPublishInfo[serverUrl].Add(monitorInfo);
+                }
+                else if (monitorInfo.Subscription.PublishingInterval > publishInterval)
+                {
+                    monitorInfo.Subscription.PublishingInterval = publishInterval;
+                    monitorInfo.Subscription.Modify();
+                }
+            }
+            else
+            {
+                monitorInfo = new MonitorPublishInfo()
+                {
+                    Topic = topic,
+                    BrokerUrl = url,
+                    Subscription = CreateSubscription(serverUrl, session, publishInterval, 0),
+                    Publisher = publisher
+                };
+                var list = new List<MonitorPublishInfo>();
+                list.Add(monitorInfo);
+                _monitorPublishInfo.Add(serverUrl, list);
+            }
+
+            foreach (var monitorableNode in monitorableNodes)
+            {
+                mi = new MonitoredItem()
+                {
+                    StartNodeId = monitorableNode.NodeId,
+                    SamplingInterval = monitorableNode.SamplingInterval
+                };
+
+                if (monitorableNode.DeadBand != "none")
+                {
+                    var a = (uint) ((DeadbandType) Enum.Parse(typeof(DeadbandType), monitorableNode.DeadBand, true));
+                    mi.Filter = new DataChangeFilter()
+                    {
+                        Trigger = DataChangeTrigger.StatusValue,
+                        DeadbandType = (uint)((DeadbandType)Enum.Parse(typeof(DeadbandType), monitorableNode.DeadBand, true)),
+                        DeadbandValue = monitorableNode.DeadBandValue
+                    };
+                }
+
+                mi.Notification += OnMonitorNotification;
+                monitorInfo.Subscription.AddItem(mi);
+                monitorInfo.Subscription.CreateItems();
+            }
+        }
+
+        private void OnMonitorNotification(MonitoredItem monitoreditem, MonitoredItemNotificationEventArgs e)
+        {
+            VariableNode varNode = (VariableNode)monitoreditem.Subscription.Session.ReadNode(monitoreditem.StartNodeId);
+            foreach (var value in monitoreditem.DequeueValues())
+            {
+                var typeManager = new DataTypeManager(monitoreditem.Subscription.Session);
+                //Sistemare senza schema
+                UaValue opcvalue = typeManager.GetUaValue(varNode, value);
+
+                var monitorInfoPair = _monitorPublishInfo
+                    .SelectMany(pair => pair.Value, (parent, child) => new { ServerUrl = parent.Key, Info = child })
+                    .First(couple => couple.Info.Subscription == monitoreditem.Subscription);
+
+                //Come viene pubblicato
+                Console.WriteLine($"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} := {opcvalue.Value}");
+
+                String result = opcvalue.Value.ToString();
+
+                var message = $"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} = {result}";
+                monitorInfoPair.Info.Forward(message);
+            }
+        }
+
+        private Subscription CreateSubscription(string serverUrl, Session session, int publishingInterval, uint maxNotificationPerPublish)
+        {
+            var sub = new Subscription(session.DefaultSubscription)
+            {
+                PublishingInterval = publishingInterval,
+                MaxNotificationsPerPublish = maxNotificationPerPublish
+            };
+
+            if (!session.AddSubscription(sub)) return null;
+            sub.Create();
+            return sub;
+
+        }
 
         #region private methods
 

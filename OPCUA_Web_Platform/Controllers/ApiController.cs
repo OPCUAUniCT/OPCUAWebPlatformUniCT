@@ -11,6 +11,7 @@ using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Models.DataSet;
 using WebPlatform.Models.OptionsModels;
+using WebPlatform.Models.OPCUA;
 using WebPlatform.OPCUALayer;
 using WebPlatform.Exceptions;
 
@@ -137,9 +138,14 @@ namespace WebPlatform.Controllers
         }
 
         [HttpPost("data-sets/{ds_id:int}/monitor")]
-        public IActionResult Monitor(int ds_id)
+        public async Task<IActionResult> Monitor(int ds_id, [FromForm] MonitorableNode monitorableNodes, string brokerUrl, string topic)
         {
-            return Ok("Monitoro");
+            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            var serverUrl = _UAServers[ds_id].Url;
+
+            await _UAClient.CreateMonitoredItemsAsync(serverUrl, new[] { monitorableNodes }, brokerUrl, topic);
+            
+            return Ok($"Monitoring started on {serverUrl}");
         }
 
         [HttpPost("data-sets/{ds_id:int}/stop-monitor")]

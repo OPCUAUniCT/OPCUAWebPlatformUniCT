@@ -24,25 +24,17 @@ namespace WebPlatform.OPCUALayer
         {
             m_session = session;
         }
-        
+
         public UaValue GetUaValue(VariableNode variableNode)
         {
-            #region local variables
-            bool isScalar = false;
-            JObject valueOut = new JObject();
-            dynamic valueOutBuiltIn;
-            JSchemaGenerator gen = new JSchemaGenerator();
-            JSchema SchemaOut = new JSchema();
-            #endregion
-            
             DataValue dataValue = m_session.ReadValue(variableNode.NodeId);
-            
-            /* Check if the value can be mapped directly as JSON base type */
-            
+            return GetUaValue(variableNode, dataValue);
+        }
+        
+        public UaValue GetUaValue(VariableNode variableNode, DataValue dataValue)
+        {
             //Get the value
             var value = new Variant(dataValue.Value);
-            //Check if it is a scalar
-            isScalar = variableNode.ValueRank == -1;
             //Get tha Built-In type to the relevant DataType
             //TODO: verificare se funziona anche levando il TypeTable
             BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, m_session.SystemContext.TypeTable);

@@ -1,6 +1,6 @@
 ﻿namespace WebPlatform.Models.OPCUA
 {
-    public class OPCElementToMonitor
+    public class MonitorableNode
     {
         public string NodeId { get; set; }
         public int SamplingInterval { get; set; }
