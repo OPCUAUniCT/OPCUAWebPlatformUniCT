@@ -269,20 +269,15 @@ namespace WebPlatform.OPCUALayer
             foreach (var value in monitoreditem.DequeueValues())
             {
                 var typeManager = new DataTypeManager(monitoreditem.Subscription.Session);
-                //Sistemare senza schema
-                UaValue opcvalue = typeManager.GetUaValue(varNode, value);
+                UaValue opcvalue = typeManager.GetUaValue(varNode, value, false);
 
                 var monitorInfoPair = _monitorPublishInfo
                     .SelectMany(pair => pair.Value, (parent, child) => new { ServerUrl = parent.Key, Info = child })
                     .First(couple => couple.Info.Subscription == monitoreditem.Subscription);
 
-                //Come viene pubblicato
-                Console.WriteLine($"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} := {opcvalue.Value}");
-
-                String result = opcvalue.Value.ToString();
-
-                var message = $"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} = {result}";
+                var message = $"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} = {opcvalue.Value}";
                 monitorInfoPair.Info.Forward(message);
+                Console.WriteLine(message);
             }
         }
 
