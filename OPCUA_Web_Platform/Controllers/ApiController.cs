@@ -1,4 +1,6 @@
-﻿using System.Net;
+﻿using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using WebPlatform.Extensions;
 using Microsoft.AspNetCore.Authorization;
@@ -24,9 +26,9 @@ namespace WebPlatform.Controllers
     public class ApiController : Controller
     {
         private OPCUAServers[] _UAServers;
-        private IUAClientSingleton _UAClient;
+        private IUaClientSingleton _UAClient;
 
-        public ApiController(IOptions<OPCUAServersOptions> servers, IUAClientSingleton UAClient)
+        public ApiController(IOptions<OPCUAServersOptions> servers, IUaClientSingleton UAClient)
         {
             this._UAServers = servers.Value.Servers;
             for (int i = 0; i < _UAServers.Length; i++) _UAServers[i].Id = i;
@@ -89,6 +91,9 @@ namespace WebPlatform.Controllers
                     var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
                     result["value"] = uaValue.Value;
                     result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
+                    result["status"] = uaValue.StatusCode?.ToString() ?? "";
+                    result["deadBand"] = await _UAClient.GetDeadBandAsync(serverUrl, varNode);
+                    result["minimumSamplingInterval"] = varNode.MinimumSamplingInterval;
                     break;
                 case NodeClass.Object:
                     result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
@@ -97,13 +102,15 @@ namespace WebPlatform.Controllers
 
             var linkedNodes = new JArray();
             var refDescriptions = await _UAClient.BrowseAsync(serverUrl, decodedNodeId);
-            foreach (ReferenceDescription rd in refDescriptions)
+            foreach (var rd in refDescriptions)
             {
-                Node refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
-                var targetNode = new JObject();
+                var refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
+                var targetNode = new JObject
+                {
+                    ["node-id"] = rd.NodeId.ToStringId(),
+                    ["name"] = rd.DisplayName.Text
+                };
 
-                targetNode["node-id"] = rd.NodeId.ToStringId();
-                targetNode["name"] = rd.DisplayName.Text;
 
                 switch (rd.NodeClass)
                 {
@@ -118,6 +125,8 @@ namespace WebPlatform.Controllers
                             ? "folder"
                             : "object";
                         break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
                 
                 targetNode["relationship"] = refTypeNode.DisplayName.Text;
@@ -133,7 +142,7 @@ namespace WebPlatform.Controllers
         [HttpPut("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-\\S+$)}")]
         public IActionResult PutNode(int ds_id, string node_id, [FromForm] VariableState state)
         {
-            if (!state.isValid) { return BadRequest("Insert a valid state for a Variable Node."); }
+            if (!state.isValid) { return BadRequest(new { error = "Insert a valid state for a Variable Node"}); }
             return Ok($"Scrivo {state.Value} sul nodo {node_id} del data set {ds_id}");
         }
 
@@ -141,6 +150,14 @@ namespace WebPlatform.Controllers
         public async Task<IActionResult> Monitor(int ds_id, [FromForm] MonitorableNode monitorableNodes, string brokerUrl, string topic)
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            if (!new List<string> {"Absolute", "Percent", "None"}.Contains(monitorableNodes.DeadBand))
+            {
+                return BadRequest(new
+                {
+                    error = "Value not allowed for DeadBand parameter"
+                });
+            }
+            
             var serverUrl = _UAServers[ds_id].Url;
 
             await _UAClient.CreateMonitoredItemsAsync(serverUrl, new[] { monitorableNodes }, brokerUrl, topic);

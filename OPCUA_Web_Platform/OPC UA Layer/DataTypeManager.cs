@@ -18,26 +18,27 @@ namespace WebPlatform.OPCUALayer
 {
     public class DataTypeManager
     {
-        private Session m_session;
+        private readonly Session _session;
         
         public DataTypeManager(Session session)
         {
-            m_session = session;
+            _session = session;
         }
 
         public UaValue GetUaValue(VariableNode variableNode, bool generateSchema = true)
         {
-            DataValue dataValue = m_session.ReadValue(variableNode.NodeId);
-            return GetUaValue(variableNode, dataValue, generateSchema);
+            DataValue dataValue = _session.ReadValue(variableNode.NodeId);
+            var uaValue = GetUaValue(variableNode, dataValue, generateSchema);
+            uaValue.StatusCode = dataValue.StatusCode;
+            return uaValue;
         }
         
         public UaValue GetUaValue(VariableNode variableNode, DataValue dataValue, bool generateSchema)
         {
-            //Get the value
             var value = new Variant(dataValue.Value);
             //Get tha Built-In type to the relevant DataType
             //TODO: verificare se funziona anche levando il TypeTable
-            BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, m_session.SystemContext.TypeTable);
+            BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
 
             switch (type)
             {
@@ -682,7 +683,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if it is not a Type of the standard information model
                 if (variableNode.DataType.NamespaceIndex != 0)
                 {
-                    var analyzer = new DataTypeAnalyzer(m_session);
+                    var analyzer = new DataTypeAnalyzer(_session);
                     var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
                     var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
                     //TODO: A cache for the dictionary could be implemented in order to improve performances
@@ -696,7 +697,7 @@ namespace WebPlatform.OPCUALayer
                     //Start parsing
                     var parser = new ParserXPath(dictionary);
                     
-                    return parser.Parse(descriptionId, (ExtensionObject) value.Value, m_session.MessageContext, generateSchema);
+                    return parser.Parse(descriptionId, (ExtensionObject) value.Value, _session.MessageContext, generateSchema);
                 }
                 
                 var structStandard = ((ExtensionObject)value.Value).Body;
@@ -709,7 +710,7 @@ namespace WebPlatform.OPCUALayer
             {
                 if (variableNode.DataType.NamespaceIndex != 0)
                 {
-                    var analyzer = new DataTypeAnalyzer(m_session);
+                    var analyzer = new DataTypeAnalyzer(_session);
                     var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
                     var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
                     //TODO: A cache for the dictionary could be implemented in order to improve performances
@@ -725,7 +726,7 @@ namespace WebPlatform.OPCUALayer
                     
                     foreach(var x in arrayValue)
                     {
-                        uaValue = parser.Parse(descriptionId, (ExtensionObject) x, m_session.MessageContext, generateSchema);
+                        uaValue = parser.Parse(descriptionId, (ExtensionObject) x, _session.MessageContext, generateSchema);
                         jArray.Add(uaValue.Value);
                     }
                     var jSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(new[]{arrayValue.Length}, uaValue.Schema) : null;
@@ -751,7 +752,7 @@ namespace WebPlatform.OPCUALayer
             ReferenceDescriptionCollection refDescriptionCollection;
             byte[] continuationPoint;
 
-            m_session.Browse(
+            _session.Browse(
                 null,
                 null,
                 dataTypeNodeId,
@@ -813,7 +814,7 @@ namespace WebPlatform.OPCUALayer
             DataValueCollection dataValueCollection;
             DiagnosticInfoCollection diagnCollection;
 
-            var responseRead = m_session.Read(null,
+            var responseRead = _session.Read(null,
                          0,
                          TimestampsToReturn.Both,
                          nodeToRead,

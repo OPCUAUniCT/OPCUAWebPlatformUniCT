@@ -58,7 +58,7 @@ namespace WebPlatform
             services.AddTransient<IAuth, StubAuthenticator>();
 
             //Register a singleton service managing OPC UA interactions
-            services.AddSingleton<IUAClientSingleton, UAClient>();
+            services.AddSingleton<IUaClientSingleton, UaClient>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

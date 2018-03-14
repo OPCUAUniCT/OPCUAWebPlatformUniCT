@@ -12,26 +12,28 @@ using WebPlatform.Monitoring;
 
 namespace WebPlatform.OPCUALayer
 {
-    public interface IUAClient
+    public interface IUaClient
     {
         Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr);
         Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeId);
         Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
+        Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
         Task<bool> isServerAvailable(string serverUrlstring);
         Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
     }
 
-    public interface IUAClientSingleton : IUAClient { }
+    public interface IUaClientSingleton : IUaClient {}
 
-    public class UAClient : IUAClientSingleton
+    public class UaClient : IUaClientSingleton
     {
         private ApplicationConfiguration _appConfiguration { get; }
-        //A Dictionary containing al the activ Sessions, indexed per server Id.
-        private Dictionary<string, Session> _sessions;
         
-        private Dictionary<string, List<MonitorPublishInfo>> _monitorPublishInfo;
+        //A Dictionary containing al the activ Sessions, indexed per server Id.
+        private readonly Dictionary<string, Session> _sessions;
+        
+        private readonly Dictionary<string, List<MonitorPublishInfo>> _monitorPublishInfo;
 
         private struct Endpoint
         {
@@ -52,11 +54,11 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
-        public UAClient()
+        public UaClient()
         {
-            this._appConfiguration = CreateAppConfiguration("OPCUAWebPlatform", 60000);
-            this._sessions = new Dictionary<string, Session>();
-            this._monitorPublishInfo = new Dictionary<string, List<MonitorPublishInfo>>();
+            _appConfiguration = CreateAppConfiguration("OPCUAWebPlatform", 60000);
+            _sessions = new Dictionary<string, Session>();
+            _monitorPublishInfo = new Dictionary<string, List<MonitorPublishInfo>>();
         }
 
         public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
@@ -139,7 +141,6 @@ namespace WebPlatform.OPCUALayer
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
             var typeManager = new DataTypeManager(session);
-            //DataValue dataValue = ReadDataValue(session, variableNode.NodeId)[0];
 
             return typeManager.GetUaValue(variableNode);
         }
@@ -185,6 +186,40 @@ namespace WebPlatform.OPCUALayer
             return true;
         }
         
+        public async Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode)
+        {
+            Session session = await GetSessionByUrlAsync(serverUrl);
+            var dataTypeId = varNode.DataType;
+
+            var browse = new Browser(session)
+            {
+                ResultMask = (uint) BrowseResultMask.TargetInfo,
+                BrowseDirection = BrowseDirection.Inverse,
+                ReferenceTypeId = ReferenceTypeIds.HasSubtype
+            };
+            
+            while (!(dataTypeId.Equals(DataTypeIds.Number)) && !(dataTypeId.Equals(DataTypeIds.BaseDataType)))
+            {
+                dataTypeId = ExpandedNodeId.ToNodeId(browse.Browse(dataTypeId)[0].NodeId, null);
+            }
+
+            var isAbsolute = (dataTypeId == DataTypeIds.Number);
+            
+            browse.BrowseDirection = BrowseDirection.Forward;
+            browse.ReferenceTypeId = ReferenceTypeIds.HasProperty;
+            var rdc = browse.Browse(varNode.NodeId);
+
+            var isPercent = rdc.Exists(rd => rd.BrowseName.Name.Equals("EURange"));
+            
+            if (isAbsolute)
+            {
+                return isPercent ? "Absoute, Percentage" : "Absolute";
+            }
+
+            return isPercent ? "Percentage" : "None";
+
+        }
+
         public async Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
             string brokerUrl, string topic)
         {
@@ -268,6 +303,7 @@ namespace WebPlatform.OPCUALayer
             VariableNode varNode = (VariableNode)monitoreditem.Subscription.Session.ReadNode(monitoreditem.StartNodeId);
             foreach (var value in monitoreditem.DequeueValues())
             {
+                Console.WriteLine("Got a value");
                 var typeManager = new DataTypeManager(monitoreditem.Subscription.Session);
                 UaValue opcvalue = typeManager.GetUaValue(varNode, value, false);
 
