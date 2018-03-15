@@ -140,9 +140,58 @@ namespace WebPlatform.Controllers
         }
 
         [HttpPut("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-\\S+$)}")]
-        public IActionResult PutNode(int ds_id, string node_id, [FromForm] VariableState state)
+        public async Task<IActionResult> PutNodeAsync(int ds_id, string node_id, [FromForm] VariableState state)
         {
             if (!state.isValid) { return BadRequest(new { error = "Insert a valid state for a Variable Node"}); }
+
+            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+
+            var serverUrl = _UAServers[ds_id].Url;
+            if (!(await _UAClient.isServerAvailable(serverUrl)))
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+
+            var decodedNodeId = WebUtility.UrlDecode(node_id);
+
+            Node sourceNode;
+            try
+            {
+                sourceNode = await _UAClient.ReadNodeAsync(serverUrl, decodedNodeId);
+            }
+            catch (ServiceResultException exc)
+            {
+                switch (exc.StatusCode)
+                {
+                    case StatusCodes.BadNodeIdUnknown:
+                        return NotFound("There is no node with the specified Node Id");
+                    case StatusCodes.BadNodeIdInvalid:
+                        return BadRequest("Provided Node Id is invalid");
+                    default:
+                        return StatusCode(500, exc.Message);
+                }
+            }
+            catch (DataSetNotAvailableException exc)
+            {
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+            }
+
+            if (sourceNode.NodeClass != NodeClass.Variable)
+                return BadRequest("There is no Value for the Node specified by the NodeId " + node_id);
+
+            VariableNode variableNode = (VariableNode)sourceNode;
+            
+            try
+            {
+                await _UAClient.WriteNodeValueAsync(serverUrl, variableNode, state);
+            }
+            catch(ValueToWriteTypeException exc)
+            {
+                return BadRequest(exc.Message);
+            }
+            catch(ServiceResultException exc)
+            {
+                return BadRequest(exc.StatusCode);
+            }
+
             return Ok($"Scrivo {state.Value} sul nodo {node_id} del data set {ds_id}");
         }
 

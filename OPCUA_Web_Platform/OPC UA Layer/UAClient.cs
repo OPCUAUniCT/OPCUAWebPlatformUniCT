@@ -9,6 +9,7 @@ using Opc.Ua.Client;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
 using WebPlatform.Monitoring;
+using WebPlatform.Models.DataSet;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -19,6 +20,7 @@ namespace WebPlatform.OPCUALayer
         Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
+        Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
         Task<bool> isServerAvailable(string serverUrlstring);
         Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
@@ -90,6 +92,29 @@ namespace WebPlatform.OPCUALayer
                 throw new DataSetNotAvailableException();
             }
             return node;
+        }
+
+
+        public async Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state)
+        {
+            Session session = await GetSessionByUrlAsync(serverUrl);
+            var typeManager = new DataTypeManager(session);
+            
+            //typeManager.GetUaValue(variableNode);
+            WriteValueCollection writeValues = new WriteValueCollection();
+            
+            WriteValue writeValue = new WriteValue
+            {
+                NodeId = variableNode.NodeId,
+                AttributeId = Attributes.Value,
+                Value = typeManager.GetDataValueForWriteService(state, variableNode)
+            };
+
+            writeValues.Add(writeValue);
+            StatusCodeCollection results = new StatusCodeCollection();
+            DiagnosticInfoCollection diagnosticInfos = new DiagnosticInfoCollection();
+            session.Write(null, writeValues, out results, out diagnosticInfos);
+            return StatusCode.IsGood(results[0]);
         }
 
         public async Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
@@ -550,8 +575,7 @@ namespace WebPlatform.OPCUALayer
 
 		    return null;
 		}
-        
-        #endregion
 
+        #endregion
     }
 }

@@ -11,7 +11,9 @@ using Newtonsoft.Json.Schema.Generation;
 using NJsonSchema;
 using Opc.Ua;
 using Opc.Ua.Client;
+using WebPlatform.Exceptions;
 using WebPlatform.Extensions;
+using WebPlatform.Models.DataSet;
 using WebPlatform.Models.OPCUA;
 
 namespace WebPlatform.OPCUALayer
@@ -25,6 +27,8 @@ namespace WebPlatform.OPCUALayer
             _session = session;
         }
 
+        #region Read UA Value
+
         public UaValue GetUaValue(VariableNode variableNode, bool generateSchema = true)
         {
             DataValue dataValue = _session.ReadValue(variableNode.NodeId);
@@ -32,7 +36,7 @@ namespace WebPlatform.OPCUALayer
             uaValue.StatusCode = dataValue.StatusCode;
             return uaValue;
         }
-        
+
         public UaValue GetUaValue(VariableNode variableNode, DataValue dataValue, bool generateSchema)
         {
             var value = new Variant(dataValue.Value);
@@ -931,7 +935,261 @@ namespace WebPlatform.OPCUALayer
 
             return array;
         }
+
+        #endregion
+        
+
+        #region Write UA Values
+
+        public DataValue GetDataValueForWriteService(VariableState state, VariableNode variableNode)
+        {
+
+            bool isScalar = variableNode.ValueRank == -1;
+
+            //DataValue dataValue = m_session.ReadValue(variableNode.NodeId);
+
+            //var value = new Variant(dataValue.Value);
+
+            BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
+
+            switch (type)
+            {
+                case BuiltInType.Boolean:
+                    return getDataValueFromBoolean(variableNode, state);
+                case BuiltInType.SByte:
+                    throw new NotImplementedException();
+                case BuiltInType.Byte:
+                    throw new NotImplementedException();
+                case BuiltInType.Int16:
+                    return getDataValueFromInt16(variableNode, state);
+                case BuiltInType.UInt16:
+                    return getDataValueFromUInt16(variableNode, state);
+                case BuiltInType.Int32:
+                    return getDataValueFromInt32(variableNode, state);
+                case BuiltInType.UInt32:
+                    return getDataValueFromUInt32(variableNode, state);
+                case BuiltInType.Int64:
+                    return getDataValueFromInt64(variableNode, state);
+                case BuiltInType.UInt64:
+                    return getDataValueFromUInt64(variableNode, state);
+                case BuiltInType.Float:
+                    throw new NotImplementedException();
+                case BuiltInType.Double:
+                    throw new NotImplementedException();
+                case BuiltInType.String:
+                    throw new NotImplementedException();
+                case BuiltInType.DateTime:
+                    throw new NotImplementedException();
+                case BuiltInType.Guid:
+                    throw new NotImplementedException();
+                case BuiltInType.DiagnosticInfo:
+                    throw new NotImplementedException();
+                case BuiltInType.LocalizedText:
+                    throw new NotImplementedException();
+                case BuiltInType.NodeId:
+                    throw new NotImplementedException();
+                case BuiltInType.ExpandedNodeId:
+                    throw new NotImplementedException();
+                case BuiltInType.StatusCode:
+                    throw new NotImplementedException();
+                case BuiltInType.QualifiedName:
+                    throw new NotImplementedException();
+                case BuiltInType.XmlElement:
+                    throw new NotImplementedException();
+                case BuiltInType.ByteString:
+                    throw new NotImplementedException();
+                case BuiltInType.Enumeration:
+                    throw new NotImplementedException();
+                case BuiltInType.ExtensionObject:
+                    throw new NotImplementedException();
+            }
+
+            return null;
+        }
+
+        private DataValue getDataValueFromBoolean(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (Boolean.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Boolean value");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                bool[] valuesToWriteArray = new bool[jArray.Count];
+                for (int i = 0; i < jArray.Count; i++)
+                {
+                    valuesToWriteArray[i] = (bool)jArray[i];
+                }
+                return new DataValue(new Variant(valuesToWriteArray));
+            }
+            else
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                int[] dimensions = jArray.GetDimensions();
+                JToken[] flatValuesToWrite = jArray.ToArray();
+                for (int i = 0; i < dimensions.Length - 1; i++)
+                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
+                bool[] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => (bool)item));
+                Matrix matrix = new Matrix(valuesToWriteArray, BuiltInType.Boolean, dimensions);
+                return new DataValue(new Variant(matrix));
+            }
+        }
+
+        private DataValue getDataValueFromInt16(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (Int16.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                Int16[] valuesToWriteArray = new Int16[jArray.Count];
+                for(int i = 0; i< jArray.Count; i++)
+                {
+                    valuesToWriteArray[i]= (Int16)jArray[i];
+                }
+                return new DataValue(new Variant(valuesToWriteArray));
+            }
+            else
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                int[] dimensions = jArray.GetDimensions();
+                JToken[] flatValuesToWrite = jArray.ToArray();
+                for (int i = 0; i<dimensions.Length-1; i++)
+                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
+                Int16[] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => (Int16)item));
+                Matrix matrix = new Matrix(valuesToWriteArray, BuiltInType.Int16, dimensions);
+                return new DataValue(new Variant(matrix));
+            }
+        }
+
+
+
+        private DataValue getDataValueFromUInt16(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (UInt16.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                UInt16[] valuesToWriteArray = new UInt16[jArray.Count];
+                for (int i = 0; i < jArray.Count; i++)
+                {
+                    valuesToWriteArray[i] = (UInt16)jArray[i];
+                }
+                return new DataValue(new Variant(valuesToWriteArray));
+            }
+            else
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                int[] dimensions = jArray.GetDimensions();
+                JToken[] flatValuesToWrite = jArray.ToArray();
+                for (int i = 0; i < dimensions.Length - 1; i++)
+                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
+                UInt16[] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => (UInt16)item));
+                Matrix matrix = new Matrix(valuesToWriteArray, BuiltInType.UInt16, dimensions);
+                return new DataValue(new Variant(matrix));
+            }
+        }
+
+        private DataValue getDataValueFromInt32(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (UInt16.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                Int32[] valuesToWriteArray = new Int32[jArray.Count];
+                for (int i = 0; i < jArray.Count; i++)
+                {
+                    valuesToWriteArray[i] = (Int32)jArray[i];
+                }
+                return new DataValue(new Variant(valuesToWriteArray));
+            }
+            else
+            {
+                JArray jArray = JArray.Parse(state.Value);
+                int[] dimensions = jArray.GetDimensions();
+                JToken[] flatValuesToWrite = jArray.ToArray();
+                for (int i = 0; i < dimensions.Length - 1; i++)
+                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
+                UInt16[] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => (UInt16)item));
+                Matrix matrix = new Matrix(valuesToWriteArray, BuiltInType.UInt16, dimensions);
+                return new DataValue(new Variant(matrix));
+            }
+        }
+        private DataValue getDataValueFromUInt32(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (UInt32.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                throw new NotImplementedException();
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+        private DataValue getDataValueFromInt64(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (Int64.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                throw new NotImplementedException();
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+        private DataValue getDataValueFromUInt64(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                if (UInt64.TryParse(state.Value, out var value))
+                    return new DataValue(new Variant(value));
+                throw new ValueToWriteTypeException("Wrong Type: Expected Integer Number");
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                throw new NotImplementedException();
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        #endregion
+
+
+
     }
+
 
     internal class PlatformStatusCode
     {
