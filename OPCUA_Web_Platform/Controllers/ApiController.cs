@@ -147,28 +147,45 @@ namespace WebPlatform.Controllers
         }
 
         [HttpPost("data-sets/{ds_id:int}/monitor")]
-        public async Task<IActionResult> Monitor(int ds_id, [FromForm] MonitorableNode monitorableNodes, string brokerUrl, string topic)
+        public async Task<IActionResult> Monitor(int ds_id, [FromBody] MonitorParams monitorParams)
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
-            if (!new List<string> {"Absolute", "Percent", "None"}.Contains(monitorableNodes.DeadBand))
+
+            if (monitorParams != null && !monitorParams.isValid())
             {
                 return BadRequest(new
                 {
-                    error = "Value not allowed for DeadBand parameter"
+                    error = "Bad parameters format."
                 });
+            }
+
+            foreach (var monitorableNode in monitorParams.MonitorableNodes)
+            {
+                if (!new List<string> {"Absolute", "Percent", "None"}.Contains(monitorableNode.DeadBand))
+                {
+                    return BadRequest(new
+                    {
+                        error = $"Value not allowed for DeadBand parameter. Found '{monitorableNode.DeadBand}'"
+                    });
+                }
             }
             
             var serverUrl = _UAServers[ds_id].Url;
-
-            await _UAClient.CreateMonitoredItemsAsync(serverUrl, new[] { monitorableNodes }, brokerUrl, topic);
+            var results = await _UAClient.CreateMonitoredItemsAsync(serverUrl, 
+                                                                    monitorParams.MonitorableNodes, 
+                                                                    monitorParams.BrokerUrl, 
+                                                                    monitorParams.Topic);
             
-            return Ok($"Monitoring started on {serverUrl}");
+            return Ok(new
+            {
+                results
+            });
         }
 
         [HttpPost("data-sets/{ds_id:int}/stop-monitor")]
-        public IActionResult StopMonitor(int ds_id)
+        public IActionResult StopMonitor(int ds_id, [FromBody] MonitorParams monitorParams)
         {
-            return Ok($"Smonitoro");
+            return Ok($"ereoto");
         }
 
     }

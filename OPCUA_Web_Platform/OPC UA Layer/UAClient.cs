@@ -21,7 +21,7 @@ namespace WebPlatform.OPCUALayer
         Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
         Task<bool> isServerAvailable(string serverUrlstring);
-        Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
+        Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
     }
 
     public interface IUaClientSingleton : IUaClient {}
@@ -213,14 +213,14 @@ namespace WebPlatform.OPCUALayer
             
             if (isAbsolute)
             {
-                return isPercent ? "Absoute, Percentage" : "Absolute";
+                return isPercent ? "Absolute, Percentage" : "Absolute";
             }
 
             return isPercent ? "Percentage" : "None";
 
         }
 
-        public async Task CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
+        public async Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
             string brokerUrl, string topic)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
@@ -273,29 +273,39 @@ namespace WebPlatform.OPCUALayer
                 _monitorPublishInfo.Add(serverUrl, list);
             }
 
+            var createdMonitoredItems = new List<MonitoredItem>();
+
             foreach (var monitorableNode in monitorableNodes)
             {
                 mi = new MonitoredItem()
                 {
-                    StartNodeId = monitorableNode.NodeId,
+                    StartNodeId = ParsePlatformNodeIdString(monitorableNode.NodeId),
                     SamplingInterval = monitorableNode.SamplingInterval
                 };
 
                 if (monitorableNode.DeadBand != "none")
                 {
-                    var a = (uint) ((DeadbandType) Enum.Parse(typeof(DeadbandType), monitorableNode.DeadBand, true));
                     mi.Filter = new DataChangeFilter()
                     {
                         Trigger = DataChangeTrigger.StatusValue,
-                        DeadbandType = (uint)((DeadbandType)Enum.Parse(typeof(DeadbandType), monitorableNode.DeadBand, true)),
+                        DeadbandType = (uint)(DeadbandType)Enum.Parse(typeof(DeadbandType), monitorableNode.DeadBand, true),
                         DeadbandValue = monitorableNode.DeadBandValue
                     };
                 }
 
                 mi.Notification += OnMonitorNotification;
                 monitorInfo.Subscription.AddItem(mi);
-                monitorInfo.Subscription.CreateItems();
+                var monitoredItems = monitorInfo.Subscription.CreateItems();
+                createdMonitoredItems.AddRange(monitoredItems);
             }
+            
+            var results = createdMonitoredItems.Select(m => m.Created).ToArray();
+            foreach (var monitoredItem in createdMonitoredItems.Where(m => !m.Created))
+            {
+                monitorInfo.Subscription.RemoveItem(monitoredItem);
+            }
+
+            return results;
         }
 
         private void OnMonitorNotification(MonitoredItem monitoreditem, MonitoredItemNotificationEventArgs e)
@@ -488,19 +498,23 @@ namespace WebPlatform.OPCUALayer
         }
 
         private NodeId ParsePlatformNodeIdString(string str)
-        {
-            const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
-            var match = Regex.Match(str, pattern);
-            var isString = match.Groups[3].Length != 0;
-            var isNumeric = match.Groups[2].Length != 0;
+		{
+			const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
+			var match = Regex.Match(str, pattern);
+		    if (match.Success)
+		    {
+		        var isString = match.Groups[3].Length != 0;
+		        var isNumeric = match.Groups[2].Length != 0;
+			
+		        var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
+		        var builtStr = $"ns={match.Groups[1]};" + idStr;
+			
+		        return new NodeId(builtStr);
+		    }
 
-            var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
-            var builtStr = $"ns={match.Groups[1]};" + idStr;
-
-            return new NodeId(builtStr);
-        }
-
-
+		    return null;
+		}
+        
         #endregion
 
     }
