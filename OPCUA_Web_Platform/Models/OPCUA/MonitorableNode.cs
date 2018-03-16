@@ -12,7 +12,7 @@ namespace WebPlatform.Models.OPCUA
         public double DeadBandValue { get; set; }
 
         //TODO: i parametri numerici possono essere = 0?
-        public bool isValid()
+        public bool IsValid()
         {
             return Regex.IsMatch(NodeId, @"^(\d+)-(?:(\d+)|(\S+))$") &&
                    SamplingInterval > 0 &&
@@ -27,11 +27,11 @@ namespace WebPlatform.Models.OPCUA
         public string BrokerUrl { get; set; }
         public MonitorableNode[] MonitorableNodes { get; set; }
 
-        public bool isValid()
+        public bool IsValid()
         {
             return Regex.IsMatch(BrokerUrl, @"^(?:mqtt|signalr):(.*)$") && 
                    Topic.Length != 0 &&
-                   MonitorableNodes.All(m => m.isValid());
+                   MonitorableNodes.All(m => m.IsValid());
         }
     }
 }

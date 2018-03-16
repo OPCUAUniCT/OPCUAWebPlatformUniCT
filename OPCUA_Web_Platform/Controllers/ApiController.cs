@@ -151,7 +151,7 @@ namespace WebPlatform.Controllers
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
-            if (monitorParams != null && !monitorParams.isValid())
+            if (monitorParams != null && !monitorParams.IsValid())
             {
                 return BadRequest(new
                 {
