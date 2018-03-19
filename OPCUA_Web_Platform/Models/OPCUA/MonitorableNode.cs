@@ -14,7 +14,7 @@ namespace WebPlatform.Models.OPCUA
         //TODO: i parametri numerici possono essere = 0?
         public bool IsValid()
         {
-            return Regex.IsMatch(NodeId, @"^(\d+)-(?:(\d+)|(\S+))$") &&
+            return !string.IsNullOrEmpty(NodeId) && Regex.IsMatch(NodeId, @"^(\d+)-(?:(\d+)|(\S+))$") &&
                    SamplingInterval > 0 &&
                    DeadBand.Length > 0 && 
                    DeadBandValue > 0;
@@ -29,9 +29,26 @@ namespace WebPlatform.Models.OPCUA
 
         public bool IsValid()
         {
-            return Regex.IsMatch(BrokerUrl, @"^(?:mqtt|signalr):(.*)$") && 
-                   Topic.Length != 0 &&
-                   MonitorableNodes.All(m => m.IsValid());
+            return !string.IsNullOrEmpty(BrokerUrl) && Regex.IsMatch(BrokerUrl, @"^(.*):(.*)$") && 
+                   !string.IsNullOrEmpty(Topic) &&
+                   MonitorableNodes != null && MonitorableNodes.All(m => m.IsValid());
+        }
+
+        public bool IsTelemetryProtocolSupported()
+        {
+            return Regex.IsMatch(BrokerUrl, @"^(mqtt|signalr):(.*)$");
+        }
+    }
+
+    public class StopMonitorParams
+    {
+        public string BrokerUrl { get; set; }
+        public string Topic { get; set; }
+        
+        public bool IsValid()
+        {
+            return !string.IsNullOrEmpty(BrokerUrl) && Regex.IsMatch(BrokerUrl, @"^(.*):(.*)$") && 
+                   !string.IsNullOrEmpty(Topic) && Topic.Length != 0;
         }
     }
 }
