@@ -200,7 +200,9 @@ namespace WebPlatform.OPCUALayer
             
             while (!(dataTypeId.Equals(DataTypeIds.Number)) && !(dataTypeId.Equals(DataTypeIds.BaseDataType)))
             {
-                dataTypeId = ExpandedNodeId.ToNodeId(browse.Browse(dataTypeId)[0].NodeId, null);
+                //Todo: remove this line when fix the issue related to ExpandedNodeId to nodeId
+                //dataTypeId = ExpandedNodeId.ToNodeId(browse.Browse(dataTypeId)[0].NodeId, null);
+                dataTypeId = browse.Browse(dataTypeId)[0].NodeId.ToNodeId();
             }
 
             var isAbsolute = (dataTypeId == DataTypeIds.Number);
@@ -280,6 +282,7 @@ namespace WebPlatform.OPCUALayer
                 mi = new MonitoredItem()
                 {
                     StartNodeId = ParsePlatformNodeIdString(monitorableNode.NodeId),
+                    DisplayName = monitorableNode.NodeId,
                     SamplingInterval = monitorableNode.SamplingInterval
                 };
 
@@ -299,7 +302,7 @@ namespace WebPlatform.OPCUALayer
                 createdMonitoredItems.AddRange(monitoredItems);
             }
             
-            var results = createdMonitoredItems.Select(m => m.Created).ToArray();
+            var results = createdMonitoredItems.Distinct().Select(m => m.Created).ToArray();
             foreach (var monitoredItem in createdMonitoredItems.Where(m => !m.Created))
             {
                 monitorInfo.Subscription.RemoveItem(monitoredItem);
@@ -321,7 +324,7 @@ namespace WebPlatform.OPCUALayer
                     .SelectMany(pair => pair.Value, (parent, child) => new { ServerUrl = parent.Key, Info = child })
                     .First(couple => couple.Info.Subscription == monitoreditem.Subscription);
 
-                var message = $"[TOPIC] {monitorInfoPair.Info.Topic} \t {monitorInfoPair.ServerUrl} = {opcvalue.Value}";
+                var message = $"[TOPIC: {monitorInfoPair.Info.Topic}]  \t ({monitoreditem.DisplayName}): {opcvalue.Value}";
                 monitorInfoPair.Info.Forward(message);
                 Console.WriteLine(message);
             }

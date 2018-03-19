@@ -286,7 +286,7 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jStringVal = new JValue(value.Value);
+                var jStringVal = new JValue(value.Value.ToString());
                 var schema = (generateSchema) ? schemaGenerator.Generate(typeof(string)) : null;
                 return new UaValue(jStringVal, schema);
             }
@@ -772,7 +772,7 @@ namespace WebPlatform.OPCUALayer
             if (enumstr)
             {
                 ReferenceDescription enumStringsReferenceDescription = refDescriptionCollection.First(referenceDescription => referenceDescription.BrowseName.Name.Equals("EnumStrings"));
-                NodeId enumStringNodeId = (NodeId)enumStringsReferenceDescription.NodeId;
+                NodeId enumStringNodeId = enumStringsReferenceDescription.NodeId.ToNodeId();
                 enumStrings = (LocalizedText[])ReadService(enumStringNodeId, Attributes.Value)[0].Value;
                 enumValues = null;
 
