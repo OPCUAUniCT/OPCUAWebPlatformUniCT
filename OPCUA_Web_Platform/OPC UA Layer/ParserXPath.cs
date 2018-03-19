@@ -44,7 +44,7 @@ namespace WebPlatform.OPCUALayer
         /// <param name="extensionObject"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        public UaValue Parse(string descriptionId, ExtensionObject extensionObject, ServiceMessageContext context)
+        public UaValue Parse(string descriptionId, ExtensionObject extensionObject, ServiceMessageContext context, bool generateSchema)
         {
             _bd = new BinaryDecoder((byte[])extensionObject.Body, context);
             
@@ -54,18 +54,13 @@ namespace WebPlatform.OPCUALayer
             };
 
             //return JsonConvert.SerializeObject(BuildJsonForObject(descriptionId), serializerSettings);
-            return BuildJsonForObject(descriptionId);
+            return BuildJsonForObject(descriptionId, generateSchema);
         }
 
-        /// <summary>
-        /// Funzione per creare il JSON dell'oggetto complesso
-        /// </summary>
-        /// <param name="descriptionId"></param>
-        /// <returns></returns>
-        private UaValue BuildJsonForObject(string descriptionId)
+        private UaValue BuildJsonForObject(string descriptionId, bool generateSchema)
         {
             var complexObj = new JObject();
-            var complexSchema = new JSchema { Type = JSchemaType.Object };
+            var complexSchema = generateSchema ? new JSchema { Type = JSchemaType.Object } : null;
 
             XPathNodeIterator iterator = _nav.Select($"/opc:TypeDictionary/opc:StructuredType[@Name='{descriptionId}']", _ns);
 
@@ -84,15 +79,21 @@ namespace WebPlatform.OPCUALayer
 
                         if (!(type.Contains("opc:") || type.Contains("ua:")))
                         {
-                            var uaValue = BuildInnerComplex(type.Split(':')[1], l);
+                            var uaValue = BuildInnerComplex(type.Split(':')[1], l, generateSchema);
                             complexObj[fieldName] = uaValue.Value;
-                            complexSchema.Properties.Add(fieldName, uaValue.Schema);
+                            if (generateSchema)
+                            {
+                                complexSchema.Properties.Add(fieldName, uaValue.Schema);
+                            }
                         }
                         else
                         {
-                            var uaValue = BuildSimple(type.Split(':')[1], l);
+                            var uaValue = BuildSimple(type.Split(':')[1], l, generateSchema);
                             complexObj[fieldName] = uaValue.Value;
-                            complexSchema.Properties.Add(fieldName, uaValue.Schema);
+                            if (generateSchema)
+                            {
+                                complexSchema.Properties.Add(fieldName, uaValue.Schema);
+                            }
                         }
                     }
                 }
@@ -109,10 +110,10 @@ namespace WebPlatform.OPCUALayer
 
         }
         
-        private UaValue BuildSimple(string type, int length)
+        private UaValue BuildSimple(string type, int length, bool generateSchema)
         {
             var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromStandardTypeDescription(type);
-            var jSchema = DataTypeSchemaGenerator.GenerateSchemaForStandardTypeDescription(builtinType);
+            var jSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForStandardTypeDescription(builtinType) : null;
             
             if (length == 1)
             {
@@ -127,25 +128,25 @@ namespace WebPlatform.OPCUALayer
                 a.Add(ReadBuiltinValue(builtinType));
             }
 
-            var arrSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, jSchema);
+            var arrSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, jSchema) : null;
             
             return new UaValue(JToken.FromObject(a), arrSchema);
         }
 
-        private UaValue BuildInnerComplex(string description, int length)
+        private UaValue BuildInnerComplex(string description, int length, bool generateSchema)
         {
-            if (length == 1) return BuildJsonForObject(description);
+            if (length == 1) return BuildJsonForObject(description, generateSchema);
             
             var jArray = new JArray();
             UaValue uaVal = new UaValue();
             
             for (int i = 0; i < length; i++)
             {
-                uaVal = BuildJsonForObject(description);
+                uaVal = BuildJsonForObject(description, generateSchema);
                 jArray.Insert(i, uaVal.Value);
             }
 
-            var jSchema = DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, uaVal.Schema);
+            var jSchema = (generateSchema) ? DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {length}, uaVal.Schema) : null;
 
             return new UaValue(jArray, jSchema);
         }

