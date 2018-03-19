@@ -29,9 +29,14 @@ namespace WebPlatform.Models.OPCUA
 
         public bool IsValid()
         {
-            return Regex.IsMatch(BrokerUrl, @"^(?:mqtt|signalr):(.*)$") && 
+            return Regex.IsMatch(BrokerUrl, @"^(.*):(.*)$") && 
                    Topic.Length != 0 &&
                    MonitorableNodes.All(m => m.IsValid());
+        }
+
+        public bool IsTelemetryProtocolSupported()
+        {
+            return Regex.IsMatch(BrokerUrl, @"^(mqtt|signalr):(.*)$");
         }
     }
 }

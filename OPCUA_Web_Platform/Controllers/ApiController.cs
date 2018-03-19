@@ -159,6 +159,14 @@ namespace WebPlatform.Controllers
                 });
             }
 
+            if (!monitorParams.IsTelemetryProtocolSupported())
+            {
+                return BadRequest(new
+                {
+                    error = "Telemetry protocol provided in the broker url is not supported by the platform."
+                });
+            }
+
             foreach (var monitorableNode in monitorParams.MonitorableNodes)
             {
                 if (!new List<string> {"Absolute", "Percent", "None"}.Contains(monitorableNode.DeadBand))
