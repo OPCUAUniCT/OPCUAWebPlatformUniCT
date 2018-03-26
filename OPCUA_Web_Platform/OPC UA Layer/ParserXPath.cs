@@ -159,7 +159,16 @@ namespace WebPlatform.OPCUALayer
         private Object ReadBuiltinValue(BuiltInType builtinType)
         {
             var methodToCall = "Read" + builtinType;
+
             MethodInfo mInfo = typeof(BinaryDecoder).GetMethod(methodToCall, new[] { typeof(string) });
+            if (builtinType == BuiltInType.ByteString)
+            {
+                Object a = mInfo.Invoke(_bd, new object[] { "" });
+                byte[] b = a as byte[];
+                var c = Convert.ToBase64String(b);
+                return c;
+            }
+                
 
             return mInfo.Invoke(_bd, new object[] { "" });
         }

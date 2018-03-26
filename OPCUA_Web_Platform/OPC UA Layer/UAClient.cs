@@ -22,7 +22,7 @@ namespace WebPlatform.OPCUALayer
         Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
         Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
-        Task<bool> isServerAvailable(string serverUrlstring);
+        Task<bool> IsServerAvailable(string serverUrlstring);
         Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
         Task<bool> DeleteMonitoringPublish(string serverUrl, string brokerUrl, string topic);
     }
@@ -99,8 +99,6 @@ namespace WebPlatform.OPCUALayer
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
             var typeManager = new DataTypeManager(session);
-            
-            //typeManager.GetUaValue(variableNode);
             WriteValueCollection writeValues = new WriteValueCollection();
             
             WriteValue writeValue = new WriteValue
@@ -114,7 +112,12 @@ namespace WebPlatform.OPCUALayer
             StatusCodeCollection results = new StatusCodeCollection();
             DiagnosticInfoCollection diagnosticInfos = new DiagnosticInfoCollection();
             session.Write(null, writeValues, out results, out diagnosticInfos);
-            return StatusCode.IsGood(results[0]);
+            if (!StatusCode.IsGood(results[0])) {
+                if (results[0] == StatusCodes.BadTypeMismatch)
+                    throw new ValueToWriteTypeException("Wrong Type Error: data sent are not of the type expected. Check your data and try again");
+                throw new ValueToWriteTypeException(results[0].ToString());
+            }
+            return true;
         }
 
         public async Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
@@ -171,7 +174,7 @@ namespace WebPlatform.OPCUALayer
             return typeManager.GetUaValue(variableNode);
         }
 
-        public async Task<bool> isServerAvailable(string serverUrlstring)
+        public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
             Session session;
             if (!_sessions.ContainsKey(serverUrlstring))

@@ -16,6 +16,7 @@ using WebPlatform.Models.OptionsModels;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.OPCUALayer;
 using WebPlatform.Exceptions;
+using System;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -48,7 +49,7 @@ namespace WebPlatform.Controllers
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
             
             var serverUrl = _UAServers[ds_id].Url;
-            if (!(await _UAClient.isServerAvailable(serverUrl)))
+            if (!(await _UAClient.IsServerAvailable(serverUrl)))
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
 
             var decodedNodeId = WebUtility.UrlDecode(node_id);
@@ -86,7 +87,6 @@ namespace WebPlatform.Controllers
                     break;
                 case NodeClass.Variable:
                     result["type"] = "variable";
-                    //TODO: gestire tutta la decodifica delle variabili. Creare un nuovo pbi;
                     var varNode = (VariableNode) sourceNode;
                     var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
                     result["value"] = uaValue.Value;
@@ -140,15 +140,22 @@ namespace WebPlatform.Controllers
         }
 
         [HttpPut("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-\\S+$)}")]
-        public async Task<IActionResult> PutNodeAsync(int ds_id, string node_id, [FromForm] VariableState state)
+        public async Task<IActionResult> PutNodeAsync(int ds_id, string node_id, [FromBody] VariableState state)
         {
-            if (!state.isValid) { return BadRequest(new { error = "Insert a valid state for a Variable Node"}); }
+            if (state == null || !state.isValid)
+                return BadRequest(new
+                {
+                    error = "Insert a valid state for a Variable Node."
+                });
 
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
             var serverUrl = _UAServers[ds_id].Url;
-            if (!(await _UAClient.isServerAvailable(serverUrl)))
-                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+            if (!(await _UAClient.IsServerAvailable(serverUrl)))
+                return StatusCode(500, new
+                {
+                    error = "Data Set " + ds_id + " NotAvailable"
+                });
 
             var decodedNodeId = WebUtility.UrlDecode(node_id);
 
@@ -162,20 +169,35 @@ namespace WebPlatform.Controllers
                 switch (exc.StatusCode)
                 {
                     case StatusCodes.BadNodeIdUnknown:
-                        return NotFound("There is no node with the specified Node Id");
+                        return NotFound(new
+                        {
+                            error = "Wrong NodeId: There is no node with the specified NodeId"
+                        });
                     case StatusCodes.BadNodeIdInvalid:
-                        return BadRequest("Provided Node Id is invalid");
+                        return BadRequest(new
+                        {
+                            error = "Provided Node Id is invalid"
+                        });
                     default:
-                        return StatusCode(500, exc.Message);
+                        return StatusCode(500, new
+                        {
+                            error = exc.Message
+                        } );
                 }
             }
             catch (DataSetNotAvailableException exc)
             {
-                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+                return StatusCode(500, new
+                {
+                    error = "Data Set " + ds_id + " NotAvailable"
+                });
             }
 
             if (sourceNode.NodeClass != NodeClass.Variable)
-                return BadRequest("There is no Value for the Node specified by the NodeId " + node_id);
+                return BadRequest(new
+                {
+                    error = "There is no Value for the Node specified by the NodeId " + node_id
+                });
 
             VariableNode variableNode = (VariableNode)sourceNode;
             
@@ -185,14 +207,34 @@ namespace WebPlatform.Controllers
             }
             catch(ValueToWriteTypeException exc)
             {
-                return BadRequest(exc.Message);
+                return BadRequest(new
+                {
+                    error = exc.Message
+                });
+            }
+            catch(NotImplementedException exc)
+            {
+                return BadRequest(new
+                {
+                    error = exc.Message
+                });
             }
             catch(ServiceResultException exc)
             {
-                return BadRequest(exc.StatusCode);
+                switch (exc.StatusCode)
+                {
+                    case (StatusCodes.BadTypeMismatch): return BadRequest(new
+                    {
+                        error = "Wrong Type - Check data and try again"
+                    });
+                    default: return BadRequest(new
+                    {
+                        error = exc.Message
+                    });
+                }
+                    
             }
-
-            return Ok($"Scrivo {state.Value} sul nodo {node_id} del data set {ds_id}");
+            return Ok("Write on Node {node_id} in the Data Set {ds_id} executed.");
         }
 
         [HttpPost("data-sets/{ds_id:int}/monitor")]

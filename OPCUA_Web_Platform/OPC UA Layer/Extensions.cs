@@ -19,10 +19,12 @@ namespace WebPlatform.Extensions
             return $"{expandedNodeId.NamespaceIndex}-{expandedNodeId.Identifier}";
         }
 
-        public static int[] GetDimensions(this JArray jArray)
+
+        //Return the array [-1] if the JToken is not an array
+        public static int[] GetDimensions(this JToken jToken)
         {
+            if (jToken.Type != JTokenType.Array) return new int[1] { -1 };
             bool isLast = false;
-            JToken jToken = jArray;
             while (!isLast)
             {
                 try
@@ -45,6 +47,35 @@ namespace WebPlatform.Extensions
             }
             return dimensions;
         }
+
+        public static JTokenType GetInnermostTypeForJTokenArray(this JToken jToken)
+        {
+            if (jToken.Type != JTokenType.Array) return JTokenType.Undefined;
+            bool isLast = false;
+            while (!isLast)
+            {
+                jToken = jToken.Last;
+                isLast = jToken.Type != JTokenType.Array;
+            }
+            return jToken.Type;
+        }
+
+        /// <summary>
+        /// This method return the @JTokenType of this JToken Array.
+        /// </summary>
+        /// <param name="jTokens"></param>
+        /// <returns>The @JTokenType of this array. In case of several JTokenTypes it returns @JTokenType.Undefined </returns>
+        public static JTokenType GetArrayType(this JToken[] jTokens)
+        {
+            JTokenType jtp = jTokens[0].Type;
+            foreach(JToken jt in jTokens)
+            {
+                if (jt.Type != jtp)
+                    return JTokenType.Undefined;
+            }
+            return jtp;
+        }
+
     }
 
 
