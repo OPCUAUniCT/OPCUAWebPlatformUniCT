@@ -22,6 +22,7 @@ namespace WebPlatform.OPCUALayer
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
         Task<bool> isServerAvailable(string serverUrlstring);
         Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
+        Task<bool> DeleteMonitoringPublish(string serverUrl, string brokerUrl, string topic);
     }
 
     public interface IUaClientSingleton : IUaClient {}
@@ -311,6 +312,40 @@ namespace WebPlatform.OPCUALayer
             return results;
         }
 
+        public async Task<bool> DeleteMonitoringPublish(string serverUrl, string brokerUrl, string topic)
+        {
+            Session session = await GetSessionByUrlAsync(serverUrl);
+
+            if (!_monitorPublishInfo.ContainsKey(serverUrl)) return false;
+            
+            const string pattern = @"^(mqtt|signalr):(.*)$";
+            var match = Regex.Match(brokerUrl, pattern);
+            brokerUrl = match.Groups[2].Value;
+            
+            var monitorPublishInfo = _monitorPublishInfo[serverUrl].Find(mpi => mpi.Topic == topic && mpi.BrokerUrl == brokerUrl);
+
+            if (monitorPublishInfo == null) return false;
+            
+            try
+            {
+                session.DeleteSubscriptions(null, new UInt32Collection(new[] {monitorPublishInfo.Subscription.Id}), out var results, out var diagnosticInfos);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return false;
+            }
+            
+            _monitorPublishInfo[serverUrl].Remove(monitorPublishInfo);
+            if (_monitorPublishInfo[serverUrl].Count == 0) _monitorPublishInfo.Remove(serverUrl);
+            
+            Console.WriteLine($"Deleted Subscription {monitorPublishInfo.Subscription.Id} for the topic {topic}.");
+            
+            return true;
+        }
+
+        #region private methods
+
         private void OnMonitorNotification(MonitoredItem monitoreditem, MonitoredItemNotificationEventArgs e)
         {
             VariableNode varNode = (VariableNode)monitoreditem.Subscription.Session.ReadNode(monitoreditem.StartNodeId);
@@ -344,14 +379,12 @@ namespace WebPlatform.OPCUALayer
 
         }
 
-        #region private methods
-
-            /// <summary>
-            /// This method is called when a OPC UA Service call in a session object returns an error 
-            /// </summary>
-            /// <param name="serverUrlstring"></param>
-            /// <returns></returns>
-            private async Task<bool> RestoreSessionAsync(string serverUrlstring)
+        /// <summary>
+        /// This method is called when a OPC UA Service call in a session object returns an error 
+        /// </summary>
+        /// <param name="serverUrlstring"></param>
+        /// <returns></returns>
+        private async Task<bool> RestoreSessionAsync(string serverUrlstring)
         {
             _sessions.Remove(serverUrlstring);
             var endpoints = new List<Endpoint>();

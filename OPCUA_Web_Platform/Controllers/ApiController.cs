@@ -151,7 +151,7 @@ namespace WebPlatform.Controllers
         {
             if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
-            if (monitorParams != null && !monitorParams.IsValid())
+            if (monitorParams == null || !monitorParams.IsValid())
             {
                 return BadRequest(new
                 {
@@ -191,9 +191,32 @@ namespace WebPlatform.Controllers
         }
 
         [HttpPost("data-sets/{ds_id:int}/stop-monitor")]
-        public IActionResult StopMonitor(int ds_id, [FromBody] MonitorParams monitorParams)
+        public async Task<IActionResult> StopMonitor(int ds_id, [FromBody] StopMonitorParams stopMonitorParams)
         {
-            return Ok($"ereoto");
+            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            
+            if (stopMonitorParams == null || !stopMonitorParams.IsValid())
+            {
+                return BadRequest(new
+                {
+                    error = "Bad parameters format."
+                });
+            }
+            
+            var serverUrl = _UAServers[ds_id].Url;
+            var result = await _UAClient.DeleteMonitoringPublish(serverUrl, stopMonitorParams.BrokerUrl,
+                    stopMonitorParams.Topic);
+
+            if (result)
+            {
+                return Ok($"Successfully stop monitoring  on broker {stopMonitorParams.BrokerUrl}.");
+            }
+            
+            return BadRequest(new
+            {
+                error = $"An error occurred trying to delete the topic {stopMonitorParams.Topic} on broker {stopMonitorParams.BrokerUrl}. " +
+                        $"Maybe there is no current monitoring for such parameters or an internal error occurred in the Data Set."
+            });
         }
 
     }
