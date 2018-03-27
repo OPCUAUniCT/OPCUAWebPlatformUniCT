@@ -911,6 +911,8 @@ namespace WebPlatform.OPC_UA_Layer
         {
             const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
             var match = Regex.Match(str, pattern);
+            if (!match.Success)
+                return null;
             var isString = match.Groups[3].Length != 0;
             var isNumeric = match.Groups[2].Length != 0;
 
