@@ -563,7 +563,7 @@ namespace WebPlatform.OPCUALayer
 
         private NodeId ParsePlatformNodeIdString(string str)
 		{
-			const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
+			const string pattern = @"^(\d+)-(?:(\d+)|(.+))$";
 			var match = Regex.Match(str, pattern);
 		    if (match.Success)
 		    {
