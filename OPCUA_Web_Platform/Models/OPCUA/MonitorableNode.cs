@@ -14,7 +14,7 @@ namespace WebPlatform.Models.OPCUA
         //TODO: i parametri numerici possono essere = 0?
         public bool IsValid()
         {
-            return !string.IsNullOrEmpty(NodeId) && Regex.IsMatch(NodeId, @"^(\d+)-(?:(\d+)|(\S+))$") &&
+            return !string.IsNullOrEmpty(NodeId) && Regex.IsMatch(NodeId, @"^(\d+)-(?:(\d+)|(.+))$") &&
                    SamplingInterval > 0 &&
                    DeadBand.Length > 0 && 
                    DeadBandValue > 0;

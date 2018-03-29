@@ -49,6 +49,8 @@ namespace WebPlatform.OPCUALayer
                     return BuiltInType.ByteString;
                 case "Guid":
                     return BuiltInType.Guid;
+                case "LocalizedText":
+                    return BuiltInType.LocalizedText;
                 default:
                     return BuiltInType.Null;
             }

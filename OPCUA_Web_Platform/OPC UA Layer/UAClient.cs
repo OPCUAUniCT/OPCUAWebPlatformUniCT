@@ -9,6 +9,7 @@ using Opc.Ua.Client;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
 using WebPlatform.Monitoring;
+using WebPlatform.Models.DataSet;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -19,8 +20,9 @@ namespace WebPlatform.OPCUALayer
         Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
+        Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state);
         Task<bool> IsFolderTypeAsync(string serverUrlstring, string nodeIdStr);
-        Task<bool> isServerAvailable(string serverUrlstring);
+        Task<bool> IsServerAvailable(string serverUrlstring);
         Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes, string brokerUrl, string topic);
         Task<bool> DeleteMonitoringPublish(string serverUrl, string brokerUrl, string topic);
     }
@@ -92,6 +94,32 @@ namespace WebPlatform.OPCUALayer
             return node;
         }
 
+
+        public async Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state)
+        {
+            Session session = await GetSessionByUrlAsync(serverUrl);
+            var typeManager = new DataTypeManager(session);
+            WriteValueCollection writeValues = new WriteValueCollection();
+            
+            WriteValue writeValue = new WriteValue
+            {
+                NodeId = variableNode.NodeId,
+                AttributeId = Attributes.Value,
+                Value = typeManager.GetDataValueForWriteService(state, variableNode)
+            };
+
+            writeValues.Add(writeValue);
+            StatusCodeCollection results = new StatusCodeCollection();
+            DiagnosticInfoCollection diagnosticInfos = new DiagnosticInfoCollection();
+            session.Write(null, writeValues, out results, out diagnosticInfos);
+            if (!StatusCode.IsGood(results[0])) {
+                if (results[0] == StatusCodes.BadTypeMismatch)
+                    throw new ValueToWriteTypeException("Wrong Type Error: data sent are not of the type expected. Check your data and try again");
+                throw new ValueToWriteTypeException(results[0].ToString());
+            }
+            return true;
+        }
+
         public async Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
@@ -146,7 +174,7 @@ namespace WebPlatform.OPCUALayer
             return typeManager.GetUaValue(variableNode);
         }
 
-        public async Task<bool> isServerAvailable(string serverUrlstring)
+        public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
             Session session;
             if (!_sessions.ContainsKey(serverUrlstring))
@@ -535,7 +563,7 @@ namespace WebPlatform.OPCUALayer
 
         private NodeId ParsePlatformNodeIdString(string str)
 		{
-			const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
+			const string pattern = @"^(\d+)-(?:(\d+)|(.+))$";
 			var match = Regex.Match(str, pattern);
 		    if (match.Success)
 		    {
@@ -550,8 +578,7 @@ namespace WebPlatform.OPCUALayer
 
 		    return null;
 		}
-        
-        #endregion
 
+        #endregion
     }
 }
