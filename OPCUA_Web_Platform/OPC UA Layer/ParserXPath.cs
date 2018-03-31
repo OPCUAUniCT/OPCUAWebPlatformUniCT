@@ -43,17 +43,12 @@ namespace WebPlatform.OPCUALayer
         /// <param name="descriptionId"></param>
         /// <param name="extensionObject"></param>
         /// <param name="context"></param>
+        /// <param name="generateSchema"></param>
         /// <returns></returns>
         public UaValue Parse(string descriptionId, ExtensionObject extensionObject, ServiceMessageContext context, bool generateSchema)
         {
             _bd = new BinaryDecoder((byte[])extensionObject.Body, context);
-            
-            var serializerSettings = new JsonSerializerSettings
-            {
-                Formatting = Formatting.Indented
-            };
 
-            //return JsonConvert.SerializeObject(BuildJsonForObject(descriptionId), serializerSettings);
             return BuildJsonForObject(descriptionId, generateSchema);
         }
 

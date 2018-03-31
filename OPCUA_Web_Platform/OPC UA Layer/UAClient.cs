@@ -17,7 +17,7 @@ namespace WebPlatform.OPCUALayer
     {
         Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr);
         Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeId);
-        Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
+        Task<IEnumerable<EdgeDescription>> BrowseAsync(string serverUrl, string nodeToBrowseIdStr);
         Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode varNode);
         Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode);
         Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state);
@@ -120,7 +120,7 @@ namespace WebPlatform.OPCUALayer
             return true;
         }
 
-        public async Task<ReferenceDescriptionCollection> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
+        public async Task<IEnumerable<EdgeDescription>> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
             NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeToBrowseIdStr);
@@ -133,7 +133,11 @@ namespace WebPlatform.OPCUALayer
                 ReferenceTypeId = ReferenceTypeIds.HierarchicalReferences
             };
 
-            return browser.Browse(nodeToBrowseId);
+            return browser.Browse(nodeToBrowseId)
+                .Select(rd => new EdgeDescription(rd.NodeId.ToStringId(session.MessageContext.NamespaceUris), 
+                    rd.DisplayName.Text, 
+                    rd.NodeClass, 
+                    rd.ReferenceTypeId));
         }
 
         public async Task<bool> IsFolderTypeAsync(string serverUrl, string nodeIdStr)
@@ -151,8 +155,7 @@ namespace WebPlatform.OPCUALayer
 
 
             ReferenceDescription refDescription = browser.Browse(nodeToBrowseId)[0];
-            //NodeId targetId = ExpandedNodeId.ToNodeId(refDescription.NodeId, null);
-            NodeId targetId = refDescription.NodeId.ToNodeId();
+            NodeId targetId = ExpandedNodeId.ToNodeId(refDescription.NodeId, session.MessageContext.NamespaceUris);
 
             //Once got the Object Type, set the browser to follow Type hierarchy in inverse order.
             browser.ReferenceTypeId = ReferenceTypeIds.HasSubtype;
@@ -161,7 +164,7 @@ namespace WebPlatform.OPCUALayer
             while (targetId != ObjectTypeIds.FolderType && targetId != ObjectTypeIds.BaseObjectType)
             {
                 refDescription = browser.Browse(targetId)[0];
-                targetId = refDescription.NodeId.ToNodeId();
+                targetId = ExpandedNodeId.ToNodeId(refDescription.NodeId, session.MessageContext.NamespaceUris);
             }
             return targetId == ObjectTypeIds.FolderType;
         }
@@ -229,9 +232,7 @@ namespace WebPlatform.OPCUALayer
             
             while (!(dataTypeId.Equals(DataTypeIds.Number)) && !(dataTypeId.Equals(DataTypeIds.BaseDataType)))
             {
-                //Todo: remove this line when fix the issue related to ExpandedNodeId to nodeId
-                //dataTypeId = ExpandedNodeId.ToNodeId(browse.Browse(dataTypeId)[0].NodeId, null);
-                dataTypeId = browse.Browse(dataTypeId)[0].NodeId.ToNodeId();
+                dataTypeId = ExpandedNodeId.ToNodeId(browse.Browse(dataTypeId)[0].NodeId, session.MessageContext.NamespaceUris);
             }
 
             var isAbsolute = (dataTypeId == DataTypeIds.Number);
