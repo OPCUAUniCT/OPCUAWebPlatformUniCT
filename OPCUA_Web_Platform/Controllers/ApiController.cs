@@ -270,10 +270,31 @@ namespace WebPlatform.Controllers
             }
             
             var serverUrl = _UAServers[ds_id].Url;
-            var results = await _UAClient.CreateMonitoredItemsAsync(serverUrl, 
-                                                                    monitorParams.MonitorableNodes, 
-                                                                    monitorParams.BrokerUrl, 
-                                                                    monitorParams.Topic);
+            bool[] results;
+            try 
+            {
+                results = await _UAClient.CreateMonitoredItemsAsync(serverUrl, 
+                    monitorParams.MonitorableNodes, 
+                    monitorParams.BrokerUrl, 
+                    monitorParams.Topic);
+            }
+            catch (ServiceResultException exc)
+            {
+                switch (exc.StatusCode)
+                {
+                    case StatusCodes.BadNodeIdUnknown:
+                        return NotFound("There is no node with the specified Node Id");
+                    case StatusCodes.BadNodeIdInvalid:
+                        return BadRequest("Provided Node Id is invalid");
+                    default:
+                        return StatusCode(500, exc.Message);
+                }
+            }
+            catch(DataSetNotAvailableException exc)
+            {
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+            }
+            
             
             return Ok(new
             {
