@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Linq;
 using Opc.Ua;
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace WebPlatform.Extensions
@@ -72,6 +73,15 @@ namespace WebPlatform.Extensions
 
     }
 
-
+    public static class CollectionInitializerExtensionMethods
+    {
+        public static void Add(this IList<JToken> list, IList<JToken> toAdd)
+        {
+            foreach (var a in toAdd)
+            {
+                list.Add(a);
+            }
+        }
+    }
     
 }
