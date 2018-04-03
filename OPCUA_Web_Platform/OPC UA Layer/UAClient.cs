@@ -69,14 +69,7 @@ namespace WebPlatform.OPCUALayer
             Session session = await GetSessionByUrlAsync(serverUrl);
             NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
             Node node;
-            try
-            {
-                node = session.ReadNode(nodeToRead);
-            }
-            catch (ServiceResultException)
-            {
-                throw new DataSetNotAvailableException();
-            }
+            node = session.ReadNode(nodeToRead);
             return node;
         }
 
@@ -84,13 +77,7 @@ namespace WebPlatform.OPCUALayer
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
             Node node;
-            try {
-                node = session.ReadNode(nodeToRead);
-            }
-            catch (ServiceResultException)
-            {
-                throw new DataSetNotAvailableException();
-            }
+            node = session.ReadNode(nodeToRead);
             return node;
         }
 

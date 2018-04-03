@@ -64,14 +64,23 @@ namespace WebPlatform.Controllers
                 switch (exc.StatusCode)
                 {
                     case StatusCodes.BadNodeIdUnknown:
-                        return NotFound("There is no node with the specified Node Id");
+                        return NotFound(new
+                        {
+                            error = "Wrong ID: There is no Resource with ID " + decodedNodeId
+                        });
                     case StatusCodes.BadNodeIdInvalid:
-                        return BadRequest("Provided Node Id is invalid");
+                        return BadRequest(new
+                        {
+                            error = "Provided ID is invalid"
+                        });
                     default:
-                        return StatusCode(500, exc.Message);
+                        return StatusCode(500, new
+                        {
+                            error = exc.Message
+                        });
                 }
             }
-            catch(DataSetNotAvailableException exc)
+            catch (DataSetNotAvailableException exc)
             {
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
             }
@@ -172,12 +181,12 @@ namespace WebPlatform.Controllers
                     case StatusCodes.BadNodeIdUnknown:
                         return NotFound(new
                         {
-                            error = "Wrong NodeId: There is no node with the specified NodeId"
+                            error = "Wrong ID: There is no Resource with ID " + decodedNodeId
                         });
                     case StatusCodes.BadNodeIdInvalid:
                         return BadRequest(new
                         {
-                            error = "Provided Node Id is invalid"
+                            error = "Provided ID is invalid"
                         });
                     default:
                         return StatusCode(500, new
