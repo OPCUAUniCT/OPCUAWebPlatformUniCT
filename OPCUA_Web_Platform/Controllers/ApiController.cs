@@ -107,8 +107,9 @@ namespace WebPlatform.Controllers
                 var refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
                 var targetNode = new JObject
                 {
-                    ["node-id"] = rd.NodeId.ToStringId(),
-                    ["name"] = rd.DisplayName.Text
+                    //["node-id"] = rd.NodeId.ToStringId(),
+                    ["node-id"] = rd.PlatformNodeId,
+                    ["name"] = rd.DisplayName
                 };
 
 
@@ -121,7 +122,7 @@ namespace WebPlatform.Controllers
                         targetNode["Type"] = "method";
                         break;
                     case NodeClass.Object:
-                        targetNode["Type"] = await _UAClient.IsFolderTypeAsync(serverUrl, rd.NodeId.ToStringId())
+                        targetNode["Type"] = await _UAClient.IsFolderTypeAsync(serverUrl, rd.PlatformNodeId)
                             ? "folder"
                             : "object";
                         break;

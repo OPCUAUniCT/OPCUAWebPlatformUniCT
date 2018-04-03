@@ -537,7 +537,7 @@ namespace WebPlatform.OPCUALayer
         //Guardare https://github.com/OPCFoundation/UA-.NETStandard/issues/369#issuecomment-367991465
         private UaValue SerializeExpandedNodeId(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schema = new JSchema()
+            var schema = (generateSchema) ? new JSchema()
             {
                 Type = JSchemaType.Object,
                 Properties = {
@@ -545,7 +545,7 @@ namespace WebPlatform.OPCUALayer
                         { "NamespaceUri", new JSchema { Type = JSchemaType.String } },
                         { "ServerIndex", new JSchema { Type = JSchemaType.Integer } }
                     }
-            };
+            } : null;
 
             if (variableNode.ValueRank == -1)
             {
@@ -810,7 +810,7 @@ namespace WebPlatform.OPCUALayer
             if (enumstr)
             {
                 ReferenceDescription enumStringsReferenceDescription = refDescriptionCollection.First(referenceDescription => referenceDescription.BrowseName.Name.Equals("EnumStrings"));
-                NodeId enumStringNodeId = enumStringsReferenceDescription.NodeId.ToNodeId();
+                NodeId enumStringNodeId = ExpandedNodeId.ToNodeId(enumStringsReferenceDescription.NodeId, _session.MessageContext.NamespaceUris);
                 enumStrings = (LocalizedText[])ReadService(enumStringNodeId, Attributes.Value)[0].Value;
                 enumValues = null;
 
@@ -977,8 +977,6 @@ namespace WebPlatform.OPCUALayer
 
         public DataValue GetDataValueForWriteService(VariableState state, VariableNode variableNode)
         {
-
-            bool isScalar = variableNode.ValueRank == -1;
 
             BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
 
