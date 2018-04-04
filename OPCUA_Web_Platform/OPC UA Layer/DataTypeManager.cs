@@ -640,27 +640,28 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jStringVal = new JValue(BitConverter.ToString((byte[])value.Value));
+                //var jStringVal = new JValue(BitConverter.ToString((byte[])value.Value));
+                var jStringVal = new JValue(Convert.ToBase64String((byte[])value.Value));
                 var schema = generateSchema ? schemaGenerator.Generate(typeof(string)) : null;
                 return new UaValue(jStringVal, schema);
             }
             else if (variableNode.ValueRank == 1)
             {
                 var arr = (Array)value.Value;
-                var jArray = new JArray(arr);
+                var newArr = new List<string>();
+                foreach (var byteString in arr)
+                {
+                    //newArr.Add(BitConverter.ToString((byte[])byteString));
+                    newArr.Add(Convert.ToBase64String((byte[])byteString));
+                }
+                var jArray = new JArray(newArr);
                 var schema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.String }) : null;
                 
                 return new UaValue(jArray, schema);
             }
             else
             {
-                var matrix = (Matrix)value.Value;
-                var arr = matrix.ToArray();
-                var arrStr = JsonConvert.SerializeObject(arr);
-                var jArr = JArray.Parse(arrStr);
-
-                var outerSchema = (generateSchema) ? DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String }) : null;
-                return new UaValue(jArr, outerSchema);
+                throw new NotImplementedException();
             }
         }
 
@@ -975,7 +976,7 @@ namespace WebPlatform.OPCUALayer
 
         #region Write UA Values
 
-        public DataValue GetDataValueForWriteService(VariableState state, VariableNode variableNode)
+        public DataValue GetDataValueFromVariableState(VariableState state, VariableNode variableNode)
         {
 
             BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
@@ -2084,7 +2085,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is a String
                 if (state.Value.Type != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON String Value but received a JSON " + state.Value.Type);
-                return new DataValue(new Variant(Convert.FromBase64String(state.Value.ToObject<String>())));
+                return new DataValue(new Variant(Convert.FromBase64String(state.Value.ToObject<string>())));
             }
             else if (variableNode.ValueRank == 1)
             {
@@ -2099,33 +2100,13 @@ namespace WebPlatform.OPCUALayer
                 //Check that all values are Strings
                 if (flatValuesToWrite.GetArrayType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON String Array as expected");
-                byte[][] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => Convert.FromBase64String(item.ToObject<String>())));
+                byte[][] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, item => Convert.FromBase64String(item.ToObject<string>()));
                 return new DataValue(new Variant(valuesToWriteArray));
             }
             else
             {
-                //Check if the JSON sent by user is an array
-                if (state.Value.Type != JTokenType.Array)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
-                JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                //Check if it is a monodimensional array
-                if (dimensions.Length == 1)
-                {
-                    if (flatValuesToWrite.GetArrayType() != JTokenType.String)
-                        throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON String Array as expected");
-                    return new DataValue(new Variant(Array.ConvertAll(flatValuesToWrite, (item => Convert.FromBase64String(item.ToObject<String>())))));
-                }
-                //Flat a multidimensional JToken Array
-                for (int i = 0; i < dimensions.Length - 1; i++)
-                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
-                //Check that all values are Strings
-                if (flatValuesToWrite.GetArrayType() != JTokenType.String)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON String Array as expected");
-                byte[][] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => Convert.FromBase64String(item.ToObject<String>())));
-                matrixToWrite = new Matrix(valuesToWriteArray, BuiltInType.ByteString, dimensions);
-                return new DataValue(new Variant(matrixToWrite));
+                //A Matrix of ByteString should not be present
+                throw new NotImplementedException();
             }
         }
 
@@ -2809,8 +2790,14 @@ namespace WebPlatform.OPCUALayer
 
         #endregion
 
-
-
+        private static byte[] ConvertStringRepresentationToByteString(string rep)
+        {
+            var arr = rep.Split('-');
+            var array = new byte[arr.Length];
+            for(var i=0; i<arr.Length; i++) array[i] = Convert.ToByte(arr[i],16);
+            
+            return array;
+        }
     }
 
 
@@ -2823,20 +2810,6 @@ namespace WebPlatform.OPCUALayer
         {
             code = Regex.Match(statusCode.ToString(), @"(Good|Uncertain|Bad)").Groups[1].ToString();
             structureChanged = statusCode.StructureChanged;
-        }
-    }
-}
-
-namespace WebPlatform.Extensions
-{
-    public static class CollectionInitializerExtensionMethods
-    {
-        public static void Add(this IList<JToken> list, IList<JToken> toAdd)
-        {
-            foreach (var a in toAdd)
-            {
-                list.Add(a);
-            }
         }
     }
 }

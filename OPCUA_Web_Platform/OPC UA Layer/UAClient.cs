@@ -92,7 +92,7 @@ namespace WebPlatform.OPCUALayer
             {
                 NodeId = variableNode.NodeId,
                 AttributeId = Attributes.Value,
-                Value = typeManager.GetDataValueForWriteService(state, variableNode)
+                Value = typeManager.GetDataValueFromVariableState(state, variableNode)
             };
 
             writeValues.Add(writeValue);
