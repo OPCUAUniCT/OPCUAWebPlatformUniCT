@@ -640,7 +640,8 @@ namespace WebPlatform.OPCUALayer
 
             if (variableNode.ValueRank == -1)
             {
-                var jStringVal = new JValue(BitConverter.ToString((byte[])value.Value));
+                //var jStringVal = new JValue(BitConverter.ToString((byte[])value.Value));
+                var jStringVal = new JValue(Convert.ToBase64String((byte[])value.Value));
                 var schema = generateSchema ? schemaGenerator.Generate(typeof(string)) : null;
                 return new UaValue(jStringVal, schema);
             }
@@ -650,7 +651,8 @@ namespace WebPlatform.OPCUALayer
                 var newArr = new List<string>();
                 foreach (var byteString in arr)
                 {
-                    newArr.Add(BitConverter.ToString((byte[])byteString));
+                    //newArr.Add(BitConverter.ToString((byte[])byteString));
+                    newArr.Add(Convert.ToBase64String((byte[])byteString));
                 }
                 var jArray = new JArray(newArr);
                 var schema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, new JSchema{ Type = JSchemaType.String }) : null;
@@ -659,13 +661,7 @@ namespace WebPlatform.OPCUALayer
             }
             else
             {
-                var matrix = (Matrix)value.Value;
-                var arr = matrix.ToArray();
-                var arrStr = JsonConvert.SerializeObject(arr);
-                var jArr = JArray.Parse(arrStr);
-
-                var outerSchema = (generateSchema) ? DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema{ Type = JSchemaType.String }) : null;
-                return new UaValue(jArr, outerSchema);
+                throw new NotImplementedException();
             }
         }
 
@@ -2089,7 +2085,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is a String
                 if (state.Value.Type != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON String Value but received a JSON " + state.Value.Type);
-                return new DataValue(new Variant(ConvertStringRepresentationToByteString(state.Value.ToObject<string>())));
+                return new DataValue(new Variant(Convert.FromBase64String(state.Value.ToObject<string>())));
             }
             else if (variableNode.ValueRank == 1)
             {
@@ -2104,7 +2100,7 @@ namespace WebPlatform.OPCUALayer
                 //Check that all values are Strings
                 if (flatValuesToWrite.GetArrayType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON String Array as expected");
-                byte[][] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, item => ConvertStringRepresentationToByteString(item.ToObject<string>()));
+                byte[][] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, item => Convert.FromBase64String(item.ToObject<string>()));
                 return new DataValue(new Variant(valuesToWriteArray));
             }
             else
