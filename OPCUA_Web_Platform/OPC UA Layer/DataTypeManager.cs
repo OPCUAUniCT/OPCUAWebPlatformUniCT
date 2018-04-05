@@ -670,20 +670,36 @@ namespace WebPlatform.OPCUALayer
                 Type = JSchemaType.Object,
                 Properties =
                 {
-                    { "EnumValue", new JSchema { Type = JSchemaType.Integer } },
-                    { "EnumLabel", new JSchema { Type = JSchemaType.String } }
+                    { "EnumIndex", new JSchema { Type = JSchemaType.Integer } },
+                    { "EnumValue", new JSchema { Type = JSchemaType.String } }
                 }
             } : null;
 
-            if (enstrreturn == 1)
+            if(enstrreturn == 1)
             {
-                List<JToken> list = enumString.Select(val => new JValue(val.Text)).Cast<JToken>().ToList();
-                if (generateSchema)
-                {
-                    innerSchema.Properties["EnumLabel"].Enum.Add(list);
-                }
+                    List<JToken> enumIndexList = new List<JToken>();
+                    for (int i = 0; i < enumString.Length; i++)
+                    {
+                        enumIndexList.Add(new JValue(i));
+                    }
+                    List<JToken> enumValueList = enumString.Select(val => new JValue(val.Text)).Cast<JToken>().ToList();
+                    innerSchema.Properties["EnumIndex"].Enum.Add(enumIndexList);
+                    innerSchema.Properties["EnumValue"].Enum.Add(enumValueList);
             }
-            
+
+            if (enstrreturn == 2)
+            {
+                List<JToken> enumIndexList = new List<JToken>();
+                List<JToken> enumValueList = new List<JToken>();
+                foreach(var val in enumValues)
+                {
+                    enumIndexList.Add(new JValue(val.Value));
+                    enumValueList.Add(new JValue(val.DisplayName.Text));
+                }
+                innerSchema.Properties["EnumIndex"].Enum.Add(enumIndexList);
+                innerSchema.Properties["EnumValue"].Enum.Add(enumValueList);
+            }
+
             if (variableNode.ValueRank == -1)
             {
                 var valueOut = GetEnumValue(value, enstrreturn, enumString, enumValues);
@@ -692,8 +708,9 @@ namespace WebPlatform.OPCUALayer
             }
             else if (variableNode.ValueRank == 1)
             {
-                var arr = (Array)value.Value;
-                var jArray = new JArray(arr);
+                var arr = (Int32[])value.Value;
+                var values = arr.Select(s => GetEnumValue(s, enstrreturn, enumString, enumValues));
+                var jArray = new JArray(values);
                 
                 var schema = generateSchema ?  DataTypeSchemaGenerator.GenerateSchemaForArray(new[] {arr.Length}, innerSchema) : null;
                 
@@ -701,13 +718,7 @@ namespace WebPlatform.OPCUALayer
             }
             else
             {
-                var matrix = (Matrix)value.Value;
-                var arr = matrix.ToArray();
-                var arrStr = JsonConvert.SerializeObject(arr);
-                var jArr = JArray.Parse(arrStr);
-
-                var outerSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, innerSchema) : null;
-                return new UaValue(jArr, outerSchema);
+                throw new NotImplementedException("Read Matrix of Emuneration not implemented");
             }
         }
 
@@ -868,8 +879,8 @@ namespace WebPlatform.OPCUALayer
             {
                 var jsonResultEnumerationCustom = new
                 {
-                    EnumValue = index,
-                    EnumLabel = ""
+                    EnumIndex = index,
+                    EnumValue = ""
                 };
                 valueOut = JObject.FromObject(jsonResultEnumerationCustom);
             }
@@ -877,17 +888,18 @@ namespace WebPlatform.OPCUALayer
             {
                 var jsonResultEnumerationCustom = new
                 {
-                    EnumValue = index,
-                    EnumLabel = enumString[index].Text
+                    EnumIndex = index,
+                    EnumValue = enumString[index].Text
                 };
                 valueOut = JObject.FromObject(jsonResultEnumerationCustom);
             }
             else
             {
+
                 var jsonResultEnumerationCustom = new
                 {
-                    EnumValue = index,
-                    EnumLabel = enumValues.First(enumValue => enumValue.Value.Equals(index)).DisplayName.Text
+                    EnumIndex = index,
+                    EnumValue = enumValues.Single(s => s.Value == index).DisplayName.Text
                 };
                 valueOut = JObject.FromObject(jsonResultEnumerationCustom);
             }
@@ -1514,19 +1526,32 @@ namespace WebPlatform.OPCUALayer
         {
             if (variableNode.ValueRank == -1)
             {
-                //Check if the JSON sent by user is a Integer
-                if (state.Value.Type != JTokenType.Integer)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Integer Value but received a JSON " + state.Value.Type);
-                Int32 value = 0;
-                try
+                //Check if the JSON sent by user is an Object
+                if (state.Value.Type != JTokenType.Object)
+                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object Value but received a JSON " + state.Value.Type);
+                JObject jObject = state.Value.ToObject<JObject>();
+                if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
+                    throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
+                JToken jtIndex = jObject["EnumIndex"];
+                JToken jtValue = jObject["EnumValue"];
+                if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
+                    throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
+                int valueToWrite = jtIndex.ToObject<Int32>();
+                int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
+
+                if(enstrreturn == 1)
                 {
-                    value = state.Value.ToObject<Int32>();
+                    if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
+                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
                 }
-                catch (OverflowException exc)
+                else if(enstrreturn == 2)
                 {
-                    throw new ValueToWriteTypeException("Range Error: " + exc.Message);
+                    var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
+                    if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
+                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
                 }
-                return new DataValue(new Variant(value));
+
+                return new DataValue(new Variant(valueToWrite));
             }
             else if (variableNode.ValueRank == 1)
             {
@@ -1538,60 +1563,42 @@ namespace WebPlatform.OPCUALayer
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                //Check that all values are Integer
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Integer)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Integer Array as expected");
-                Int32[] valuesToWriteArray;
-                try
+                //Check that all values are Object
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Object)
+                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Object Array as expected");
+                Int32[] valuesToWriteArray = new Int32[flatValuesToWrite.Length];
+                JObject jObject;
+                for (int i = 0; i < flatValuesToWrite.Length; i++)
                 {
-                    valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Int32>()));
+                    jObject = flatValuesToWrite[i].ToObject<JObject>();
+                    if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
+                        throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
+                    JToken jtIndex = jObject["EnumIndex"];
+                    JToken jtValue = jObject["EnumValue"];
+                    if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
+                        throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
+                    int valueToWrite = jtIndex.ToObject<Int32>();
+                    int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
+
+                    if (enstrreturn == 1)
+                    {
+                        if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
+                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                    }
+                    else if (enstrreturn == 2)
+                    {
+                        var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
+                        if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
+                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                    }
+                    valuesToWriteArray[i] = valueToWrite;
                 }
-                catch (OverflowException exc)
-                {
-                    throw new ValueToWriteTypeException("Range Error in one or more values of the array: " + exc.Message);
-                }
+
                 return new DataValue(new Variant(valuesToWriteArray));
             }
             else
             {
-                //Check if the JSON sent by user is an array
-                if (state.Value.Type != JTokenType.Array)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
-                JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                //Check if it is a monodimensional array
-                Int32[] valuesToWriteArray;
-                if (dimensions.Length == 1)
-                {
-                    if (flatValuesToWrite.GetArrayType() != JTokenType.Integer)
-                        throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Integer Array as expected");
-                    try
-                    {
-                        valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Int32>()));
-                    }
-                    catch (OverflowException exc)
-                    {
-                        throw new ValueToWriteTypeException("Range Error in one or more values of the array: " + exc.Message);
-                    }
-                    return new DataValue(new Variant(valuesToWriteArray));
-                }
-                //Flat a multidimensional JToken Array
-                for (int i = 0; i < dimensions.Length - 1; i++)
-                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
-                //Check that all values are Integer
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Integer)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Integer Array as expected");
-                try
-                {
-                    valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Int32>()));
-                }
-                catch (OverflowException exc)
-                {
-                    throw new ValueToWriteTypeException("Range Error in one or more values of the array: " + exc.Message);
-                }
-                matrixToWrite = new Matrix(valuesToWriteArray, BuiltInType.Enumeration, dimensions);
-                return new DataValue(new Variant(matrixToWrite));
+                throw new NotImplementedException("Write Matrix of Enumeration not supported");
             }
         }
 
