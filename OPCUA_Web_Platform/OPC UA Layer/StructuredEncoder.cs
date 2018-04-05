@@ -504,7 +504,7 @@ namespace WebPlatform.OPC_UA_Layer
         {
             if (lenghtOfArray == 1)
             {
-                if (jToken.Type != JTokenType.Float)
+                if (jToken.Type != JTokenType.Float && jToken.Type != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be a Number but received a " + jToken.Type.ToString());
                 Single valueToWrite;
                 try
@@ -543,7 +543,7 @@ namespace WebPlatform.OPC_UA_Layer
         {
             if (lenghtOfArray == 1)
             {
-                if (jToken.Type != JTokenType.Float)
+                if (jToken.Type != JTokenType.Float && jToken.Type != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be a Number but received a " + jToken.Type.ToString());
                 Double valueToWrite;
                 try

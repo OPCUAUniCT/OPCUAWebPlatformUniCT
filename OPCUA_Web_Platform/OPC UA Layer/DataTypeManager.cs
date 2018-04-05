@@ -1855,7 +1855,7 @@ namespace WebPlatform.OPCUALayer
             if (variableNode.ValueRank == -1)
             {
                 //Check if the JSON sent by user is a Float
-                if (state.Value.Type != JTokenType.Float)
+                if (state.Value.Type != JTokenType.Float && state.Value.Type != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Number Value but received a JSON " + state.Value.Type);
                 Single value = 0;
                 try
@@ -1879,7 +1879,7 @@ namespace WebPlatform.OPCUALayer
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check that all values are Float
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                 Single[] valuesToWriteArray;
                 try
@@ -1904,7 +1904,7 @@ namespace WebPlatform.OPCUALayer
                 Single[] valuesToWriteArray;
                 if (dimensions.Length == 1)
                 {
-                    if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                    if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                         throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                     try
                     {
@@ -1920,7 +1920,7 @@ namespace WebPlatform.OPCUALayer
                 for (int i = 0; i < dimensions.Length - 1; i++)
                     flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
                 //Check that all values are Float
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                 try
                 {
@@ -1940,7 +1940,7 @@ namespace WebPlatform.OPCUALayer
             if (variableNode.ValueRank == -1)
             {
                 //Check if the JSON sent by user is a Float
-                if (state.Value.Type != JTokenType.Float)
+                if (state.Value.Type != JTokenType.Float && state.Value.Type != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Number Value but received a JSON " + state.Value.Type);
                 Double value = 0;
                 try
@@ -1964,7 +1964,7 @@ namespace WebPlatform.OPCUALayer
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check that all values are Float
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                 Double[] valuesToWriteArray;
                 try
@@ -1989,7 +1989,7 @@ namespace WebPlatform.OPCUALayer
                 Double[] valuesToWriteArray;
                 if (dimensions.Length == 1)
                 {
-                    if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                    if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                         throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                     try
                     {
@@ -2005,7 +2005,7 @@ namespace WebPlatform.OPCUALayer
                 for (int i = 0; i < dimensions.Length - 1; i++)
                     flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
                 //Check that all values are Float
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Float)
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Float && flatValuesToWrite.GetArrayType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Number Array as expected");
                 try
                 {
