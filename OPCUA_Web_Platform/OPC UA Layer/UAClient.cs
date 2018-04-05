@@ -179,7 +179,7 @@ namespace WebPlatform.OPCUALayer
                         endpoint_id++;
                     }
                 }
-                catch (Exception exc)
+                catch (ServiceResultException)
                 {
                     return false;
                 }
@@ -194,7 +194,7 @@ namespace WebPlatform.OPCUALayer
             {
                 serverStatus = session.ReadValue(new NodeId(2259, 0));
             }
-            catch (Exception exc)
+            catch (Exception)
             {
                 return await RestoreSessionAsync(serverUrlstring);
             }
@@ -346,7 +346,7 @@ namespace WebPlatform.OPCUALayer
             {
                 session.DeleteSubscriptions(null, new UInt32Collection(new[] {monitorPublishInfo.Subscription.Id}), out var results, out var diagnosticInfos);
             }
-            catch (Exception e)
+            catch (ServiceResultException e)
             {
                 Console.WriteLine(e);
                 return false;
@@ -414,7 +414,7 @@ namespace WebPlatform.OPCUALayer
                 }
                 await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
             }
-            catch (Exception exc)
+            catch (ServiceResultException)
             {
                 return false;
             }
@@ -438,13 +438,9 @@ namespace WebPlatform.OPCUALayer
                         endpoint_id++;
                     }
                 }
-                catch (ServiceResultException exc)
+                catch (ServiceResultException)
                 {
-                    switch (exc.StatusCode)
-                    {
-                        case (StatusCodes.BadNotConnected):
-                            throw new DataSetNotAvailableException();
-                    }
+                    throw new DataSetNotAvailableException();
                 }
                 //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
                 #warning Indice fisso a 0
@@ -537,15 +533,8 @@ namespace WebPlatform.OPCUALayer
 
             using (DiscoveryClient client = DiscoveryClient.Create(serverURI, EndpointConfiguration.Create(_appConfiguration)))
             {
-                try
-                {
-                    EndpointDescriptionCollection endpoints = client.GetEndpoints(null);
-                    return endpoints;
-                }
-                catch (ServiceResultException exc)
-                {
-                    throw exc;
-                }
+                EndpointDescriptionCollection endpoints = client.GetEndpoints(null);
+                return endpoints;
             }
         }
 

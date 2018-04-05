@@ -16,7 +16,6 @@ using WebPlatform.Models.OptionsModels;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.OPCUALayer;
 using WebPlatform.Exceptions;
-using System;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -55,9 +54,69 @@ namespace WebPlatform.Controllers
             var decodedNodeId = WebUtility.UrlDecode(node_id);
             
             Node sourceNode;
+            JObject result = new JObject();
+
             try 
             {
 			    sourceNode = await _UAClient.ReadNodeAsync(serverUrl, decodedNodeId);
+                result["node-id"] = decodedNodeId;
+                result["name"] = sourceNode.DisplayName.Text;
+
+                switch (sourceNode.NodeClass)
+                {
+                    case NodeClass.Method:
+                        result["type"] = "method";
+                        break;
+                    case NodeClass.Variable:
+                        result["type"] = "variable";
+                        var varNode = (VariableNode)sourceNode;
+                        var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
+                        result["value"] = uaValue.Value;
+                        result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
+                        result["status"] = uaValue.StatusCode?.ToString() ?? "";
+                        result["deadBand"] = await _UAClient.GetDeadBandAsync(serverUrl, varNode);
+                        result["minimumSamplingInterval"] = varNode.MinimumSamplingInterval;
+                        break;
+                    case NodeClass.Object:
+                        result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
+                        break;
+                }
+
+                var linkedNodes = new JArray();
+                var refDescriptions = await _UAClient.BrowseAsync(serverUrl, decodedNodeId);
+                foreach (var rd in refDescriptions)
+                {
+                    var refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
+                    var targetNode = new JObject
+                    {
+                        ["node-id"] = rd.PlatformNodeId,
+                        ["name"] = rd.DisplayName
+                    };
+
+
+                    switch (rd.NodeClass)
+                    {
+                        case NodeClass.Variable:
+                            targetNode["Type"] = "variable";
+                            break;
+                        case NodeClass.Method:
+                            targetNode["Type"] = "method";
+                            break;
+                        case NodeClass.Object:
+                            targetNode["Type"] = await _UAClient.IsFolderTypeAsync(serverUrl, rd.PlatformNodeId)
+                                ? "folder"
+                                : "object";
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+
+                    targetNode["relationship"] = refTypeNode.DisplayName.Text;
+
+                    linkedNodes.Add(targetNode);
+                }
+
+                result["edges"] = linkedNodes;
             }
             catch (ServiceResultException exc)
             {
@@ -73,6 +132,14 @@ namespace WebPlatform.Controllers
                         {
                             error = "Provided ID is invalid"
                         });
+                    case StatusCodes.BadSessionIdInvalid:
+                    case StatusCodes.BadSessionClosed:
+                    case StatusCodes.BadSessionNotActivated:
+                    case StatusCodes.BadTooManySessions:
+                        return StatusCode(500, new
+                        {
+                            error = "Connection Lost"
+                        });
                     default:
                         return StatusCode(500, new
                         {
@@ -80,71 +147,10 @@ namespace WebPlatform.Controllers
                         });
                 }
             }
-            catch (DataSetNotAvailableException exc)
+            catch (DataSetNotAvailableException)
             {
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
             }
-
-            JObject result = new JObject();
-            result["node-id"] = decodedNodeId;
-            result["name"] = sourceNode.DisplayName.Text;
-
-            switch (sourceNode.NodeClass)
-            {
-                case NodeClass.Method:
-                    result["type"] = "method";
-                    break;
-                case NodeClass.Variable:
-                    result["type"] = "variable";
-                    var varNode = (VariableNode) sourceNode;
-                    var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
-                    result["value"] = uaValue.Value;
-                    result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
-                    result["status"] = uaValue.StatusCode?.ToString() ?? "";
-                    result["deadBand"] = await _UAClient.GetDeadBandAsync(serverUrl, varNode);
-                    result["minimumSamplingInterval"] = varNode.MinimumSamplingInterval;
-                    break;
-                case NodeClass.Object:
-                    result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
-                    break;
-            }
-
-            var linkedNodes = new JArray();
-            var refDescriptions = await _UAClient.BrowseAsync(serverUrl, decodedNodeId);
-            foreach (var rd in refDescriptions)
-            {
-                var refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
-                var targetNode = new JObject
-                {
-                    //["node-id"] = rd.NodeId.ToStringId(),
-                    ["node-id"] = rd.PlatformNodeId,
-                    ["name"] = rd.DisplayName
-                };
-
-
-                switch (rd.NodeClass)
-                {
-                    case NodeClass.Variable:
-                        targetNode["Type"] = "variable";
-                        break;
-                    case NodeClass.Method:
-                        targetNode["Type"] = "method";
-                        break;
-                    case NodeClass.Object:
-                        targetNode["Type"] = await _UAClient.IsFolderTypeAsync(serverUrl, rd.PlatformNodeId)
-                            ? "folder"
-                            : "object";
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-                
-                targetNode["relationship"] = refTypeNode.DisplayName.Text;
-                
-                linkedNodes.Add(targetNode);
-            }
-
-            result["edges"] = linkedNodes;
             
             return Ok(result);
         }
@@ -188,14 +194,22 @@ namespace WebPlatform.Controllers
                         {
                             error = "Provided ID is invalid"
                         });
+                    case StatusCodes.BadSessionIdInvalid:
+                    case StatusCodes.BadSessionClosed:
+                    case StatusCodes.BadSessionNotActivated:
+                    case StatusCodes.BadTooManySessions:
+                        return StatusCode(500, new
+                        {
+                            error = "Connection Lost"
+                        });
                     default:
                         return StatusCode(500, new
                         {
                             error = exc.Message
-                        } );
+                        });
                 }
             }
-            catch (DataSetNotAvailableException exc)
+            catch (DataSetNotAvailableException)
             {
                 return StatusCode(500, new
                 {
@@ -224,7 +238,7 @@ namespace WebPlatform.Controllers
             }
             catch(NotImplementedException exc)
             {
-                return BadRequest(new
+                return StatusCode(500, new
                 {
                     error = exc.Message
                 });
@@ -237,6 +251,14 @@ namespace WebPlatform.Controllers
                     {
                         error = "Wrong Type - Check data and try again"
                     });
+                    case StatusCodes.BadSessionIdInvalid:
+                    case StatusCodes.BadSessionClosed:
+                    case StatusCodes.BadSessionNotActivated:
+                    case StatusCodes.BadTooManySessions:
+                        return StatusCode(500, new
+                        {
+                            error = "Connection Lost"
+                        });
                     default: return BadRequest(new
                     {
                         error = exc.Message
@@ -296,11 +318,19 @@ namespace WebPlatform.Controllers
                         return NotFound("There is no node with the specified Node Id");
                     case StatusCodes.BadNodeIdInvalid:
                         return BadRequest("Provided Node Id is invalid");
+                    case StatusCodes.BadSessionIdInvalid:
+                    case StatusCodes.BadSessionClosed:
+                    case StatusCodes.BadSessionNotActivated:
+                    case StatusCodes.BadTooManySessions:
+                        return StatusCode(500, new
+                        {
+                            error = "Connection Lost"
+                        });
                     default:
                         return StatusCode(500, exc.Message);
                 }
             }
-            catch(DataSetNotAvailableException exc)
+            catch(DataSetNotAvailableException)
             {
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
             }
