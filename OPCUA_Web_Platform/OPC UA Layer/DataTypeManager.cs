@@ -39,8 +39,6 @@ namespace WebPlatform.OPCUALayer
         public UaValue GetUaValue(VariableNode variableNode, DataValue dataValue, bool generateSchema)
         {
             var value = new Variant(dataValue.Value);
-            //Get tha Built-In type to the relevant DataType
-            //TODO: verificare se funziona anche levando il TypeTable
             BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
 
             switch (type)
@@ -533,8 +531,6 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
-        //Warning: bisogna gestire gli ExpandedNodeId quando absolute = true
-        //Guardare https://github.com/OPCFoundation/UA-.NETStandard/issues/369#issuecomment-367991465
         private UaValue SerializeExpandedNodeId(VariableNode variableNode, Variant value, bool generateSchema)
         {
             var schema = (generateSchema) ? new JSchema()
@@ -554,7 +550,7 @@ namespace WebPlatform.OPCUALayer
                 if (expandedNodeId.IdType == IdType.Opaque)
                     NodeId = expandedNodeId.NamespaceIndex + "-" + Convert.ToBase64String((byte[])expandedNodeId.Identifier);
                 else
-                    NodeId = expandedNodeId.NamespaceIndex + "-" + expandedNodeId.Identifier.ToString();
+                    NodeId = expandedNodeId.NamespaceIndex + "-" + expandedNodeId.Identifier;
                 string NamespaceUri = "";
                 if (expandedNodeId.NamespaceUri != null)
                     NamespaceUri = expandedNodeId.NamespaceUri;
@@ -580,7 +576,7 @@ namespace WebPlatform.OPCUALayer
                     if (expandedNodeIds[i].IdType == IdType.Opaque)
                         NodeId = expandedNodeIds[i].NamespaceIndex + "-" + Convert.ToBase64String((byte[])expandedNodeIds[i].Identifier, 0, ((byte[])expandedNodeIds[i].Identifier).Length);
                     else
-                        NodeId = expandedNodeIds[i].NamespaceIndex + "-" + expandedNodeIds[i].Identifier.ToString();
+                        NodeId = expandedNodeIds[i].NamespaceIndex + "-" + expandedNodeIds[i].Identifier;
                     NamespaceUri = "";
                     if (expandedNodeIds[i].NamespaceUri != null)
                         NamespaceUri = expandedNodeIds[i].NamespaceUri;
@@ -725,7 +721,6 @@ namespace WebPlatform.OPCUALayer
                     var analyzer = new DataTypeAnalyzer(_session);
                     var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
                     var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
-                    //TODO: A cache for the dictionary could be implemented in order to improve performances
                     string dictionary = analyzer.GetDictionary(descriptionNodeId);
                     
                     //Retrieve a key that will be used by the Parser. As explained in the specification Part 3, 
@@ -2789,15 +2784,6 @@ namespace WebPlatform.OPCUALayer
         }
 
         #endregion
-
-        private static byte[] ConvertStringRepresentationToByteString(string rep)
-        {
-            var arr = rep.Split('-');
-            var array = new byte[arr.Length];
-            for(var i=0; i<arr.Length; i++) array[i] = Convert.ToByte(arr[i],16);
-            
-            return array;
-        }
     }
 
 

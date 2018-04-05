@@ -61,6 +61,10 @@ namespace WebPlatform.OPCUALayer
 
             while(iterator.MoveNext())
             {
+                var structuredBaseType = iterator.Current.GetAttribute("BaseType", "");
+                
+                if (structuredBaseType == "ua:Union") throw new NotSupportedException("Union decoding not implemented in the current version of the platform");
+                
                 XPathNodeIterator newIterator = iterator.Current.SelectDescendants(XPathNodeType.Element, matchSelf: false);
                 while(newIterator.MoveNext())
                 {
@@ -83,7 +87,7 @@ namespace WebPlatform.OPCUALayer
                         }
                         else
                         {
-                            var uaValue = BuildSimple(type.Split(':')[1], l, generateSchema);
+                            var uaValue = BuildSimple(type, l, generateSchema);
                             complexObj[fieldName] = uaValue.Value;
                             if (generateSchema)
                             {
@@ -107,7 +111,7 @@ namespace WebPlatform.OPCUALayer
         
         private UaValue BuildSimple(string type, int length, bool generateSchema)
         {
-            var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromStandardTypeDescription(type);
+            var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromTypeName(type.Split(':')[0], type.Split(':')[1]);
             var jSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForStandardTypeDescription(builtinType) : null;
             
             if (length == 1)
