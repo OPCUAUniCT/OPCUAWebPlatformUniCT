@@ -57,7 +57,6 @@ namespace WebPlatform.OPC_UA_Layer
                         string fieldName = newIterator.Current.GetAttribute("Name", "");
                         
                         string typeName = newIterator.Current.GetAttribute("TypeName", "");
-                        string typeNameSplitted = typeName.Split(':')[1];
                         string lengthSource = newIterator.Current.GetAttribute("LengthField", "");
 
                         if (!dataToEncode.ContainsKey(fieldName))
@@ -70,7 +69,7 @@ namespace WebPlatform.OPC_UA_Layer
                             {
                                 if(innerData.Type != JTokenType.Object)
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be a JSON Object");
-                                EncodeJSONObject(typeNameSplitted, innerData.ToObject<JObject>());
+                                EncodeJSONObject(typeName.Split(':')[1], innerData.ToObject<JObject>());
                             }
                             else
                             {
@@ -83,13 +82,13 @@ namespace WebPlatform.OPC_UA_Layer
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON Object");
                                 for(int i = 0;  i<l; i++)
                                 {
-                                    EncodeJSONObject(typeNameSplitted, jtArray[i].ToObject<JObject>());
+                                    EncodeJSONObject(typeName.Split(':')[1], jtArray[i].ToObject<JObject>());
                                 }
                             }
                         }
                         else
                         {
-                            var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromStandardTypeDescription(typeNameSplitted);
+                            var builtinType = DataTypeAnalyzer.GetBuiltinTypeFromTypeName(typeName.Split(':')[0], typeName.Split(':')[1]);
                             switch (builtinType)
                             {
                                 case BuiltInType.Boolean:

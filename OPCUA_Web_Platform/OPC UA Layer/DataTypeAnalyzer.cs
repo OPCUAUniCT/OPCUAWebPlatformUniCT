@@ -1,6 +1,7 @@
 ﻿using System;
 using Opc.Ua;
 using Opc.Ua.Client;
+using WebPlatform.Exceptions;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -13,7 +14,25 @@ namespace WebPlatform.OPCUALayer
             this.m_session = session;
         }
 
-        public static BuiltInType GetBuiltinTypeFromStandardTypeDescription(string type)
+        public static BuiltInType GetBuiltinTypeFromTypeName(string nameSpace, string type)
+        {
+            switch (nameSpace)
+            {
+                case "opc":
+                    return GetBuiltinTypeFromBinaryTypeName(type);
+                case "ua":
+                    return GetBuiltinTypeFromUaTypeName(type);
+                default:
+                    throw new NotSupportedNamespaceException("The structured value contains a field of an unknown TypeName.");
+            }
+        }
+
+        private static BuiltInType GetBuiltinTypeFromUaTypeName(string type)
+        {
+            return Enum.TryParse(type, true, out BuiltInType builtInType) ? builtInType : BuiltInType.Null;
+        }
+
+        private static BuiltInType GetBuiltinTypeFromBinaryTypeName(string type)
         {
             switch (type)
             {
@@ -49,18 +68,13 @@ namespace WebPlatform.OPCUALayer
                     return BuiltInType.ByteString;
                 case "Guid":
                     return BuiltInType.Guid;
-                case "LocalizedText":
-                    return BuiltInType.LocalizedText;
                 default:
                     return BuiltInType.Null;
             }
         }
-        
+
         internal NodeId GetDataTypeEncodingNodeId(NodeId dataTypeNodeId)
         {
-            ReferenceDescriptionCollection refDescriptionCollection;
-            byte[] continuationPoint;
-
             m_session.Browse(
                 null,
                 null,
@@ -70,8 +84,8 @@ namespace WebPlatform.OPCUALayer
                 ReferenceTypeIds.HasEncoding,
                 true,
                 (uint)NodeClass.Object,
-                out continuationPoint,
-                out refDescriptionCollection);
+                out var continuationPoint,
+                out var refDescriptionCollection);
 
             //Choose always first encoding
             return (NodeId)refDescriptionCollection[0].NodeId;
@@ -79,9 +93,6 @@ namespace WebPlatform.OPCUALayer
         
         internal NodeId GetDataTypeDescriptionNodeId(NodeId dataTypeEncodingNodeId)
         {
-            ReferenceDescriptionCollection refDescriptionCollection;
-            byte[] continuationPoint;
-
             m_session.Browse(
                 null,
                 null,
@@ -91,17 +102,14 @@ namespace WebPlatform.OPCUALayer
                 ReferenceTypeIds.HasDescription,  //HasDescription reference
                 true,
                 (uint)NodeClass.Variable,
-                out continuationPoint,
-                out refDescriptionCollection);
+                out var continuationPoint,
+                out var refDescriptionCollection);
 
             return (NodeId)refDescriptionCollection[0].NodeId;
         }
         
         internal string GetDictionary(NodeId dataTypeDescriptionNodeId)
         {
-            ReferenceDescriptionCollection refDescriptionCollection;
-            byte[] continuationPoint;
-
             m_session.Browse(
                 null,
                 null,
@@ -111,8 +119,8 @@ namespace WebPlatform.OPCUALayer
                 ReferenceTypeIds.HasComponent, //So it is ComponentOf
                 true,
                 (uint)NodeClass.Variable,
-                out continuationPoint,
-                out refDescriptionCollection);
+                out var continuationPoint,
+                out var refDescriptionCollection);
 
             var dataTypeDictionaryNodeId = (NodeId)refDescriptionCollection[0].NodeId;
 
@@ -133,15 +141,12 @@ namespace WebPlatform.OPCUALayer
 
             nodeToRead.Add(vId);
 
-            DataValueCollection dataValueCollection;
-            DiagnosticInfoCollection diagnCollection;
-
             var responseRead = m_session.Read(null,
                 0,
                 TimestampsToReturn.Both,
                 nodeToRead,
-                out dataValueCollection,
-                out diagnCollection
+                out var dataValueCollection,
+                out var diagnCollection
             );
 
             return dataValueCollection;
