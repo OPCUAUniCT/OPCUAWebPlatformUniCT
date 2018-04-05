@@ -158,10 +158,16 @@ namespace WebPlatform.OPCUALayer
             MethodInfo mInfo = typeof(BinaryDecoder).GetMethod(methodToCall, new[] { typeof(string) });
             if (builtinType == BuiltInType.ByteString)
             {
-                Object a = mInfo.Invoke(_bd, new object[] { "" });
-                byte[] b = a as byte[];
-                var c = Convert.ToBase64String(b);
-                return c;
+                Object byteStringObject = mInfo.Invoke(_bd, new object[] { "" });
+                byte[] byteString = byteStringObject as byte[];
+                var base64ByteString = Convert.ToBase64String(byteString);
+                return base64ByteString;
+            }
+            if (builtinType == BuiltInType.Guid)
+            {
+                Object guidObject = mInfo.Invoke(_bd, new object[] { "" });
+                string guid = guidObject.ToString();
+                return guid;
             }
                 
 
