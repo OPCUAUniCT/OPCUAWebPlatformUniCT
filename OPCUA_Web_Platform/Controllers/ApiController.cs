@@ -25,30 +25,30 @@ namespace WebPlatform.Controllers
     [Route("[controller]")]
     public class ApiController : Controller
     {
-        private OPCUAServers[] _UAServers;
-        private IUaClientSingleton _UAClient;
+        private readonly OPCUAServers[] _uaServers;
+        private readonly IUaClientSingleton _uaClient;
 
         public ApiController(IOptions<OPCUAServersOptions> servers, IUaClientSingleton UAClient)
         {
-            this._UAServers = servers.Value.Servers;
-            for (int i = 0; i < _UAServers.Length; i++) _UAServers[i].Id = i;
+            this._uaServers = servers.Value.Servers;
+            for (int i = 0; i < _uaServers.Length; i++) _uaServers[i].Id = i;
 
-            this._UAClient = UAClient;
+            this._uaClient = UAClient;
         }
 
         [HttpGet("data-sets")]
         public IActionResult GetDataSets()
         {
-            return Ok( _UAServers );
+            return Ok( _uaServers );
         }
 
         [HttpGet("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-(?:(\\d+)|(.+))$)?}")]
         public async Task<IActionResult> GetNode(int ds_id, string node_id = "0-85")
         {
-            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            if (ds_id < 0 || ds_id >= _uaServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
             
-            var serverUrl = _UAServers[ds_id].Url;
-            if (!(await _UAClient.IsServerAvailable(serverUrl)))
+            var serverUrl = _uaServers[ds_id].Url;
+            if (!(await _uaClient.IsServerAvailable(serverUrl)))
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
 
             var decodedNodeId = WebUtility.UrlDecode(node_id);
@@ -58,7 +58,7 @@ namespace WebPlatform.Controllers
 
             try 
             {
-			    sourceNode = await _UAClient.ReadNodeAsync(serverUrl, decodedNodeId);
+			    sourceNode = await _uaClient.ReadNodeAsync(serverUrl, decodedNodeId);
                 result["node-id"] = decodedNodeId;
                 result["name"] = sourceNode.DisplayName.Text;
 
@@ -70,23 +70,23 @@ namespace WebPlatform.Controllers
                     case NodeClass.Variable:
                         result["type"] = "variable";
                         var varNode = (VariableNode)sourceNode;
-                        var uaValue = await _UAClient.ReadUaValueAsync(serverUrl, varNode);
+                        var uaValue = await _uaClient.ReadUaValueAsync(serverUrl, varNode);
                         result["value"] = uaValue.Value;
                         result["value-schema"] = JObject.Parse(uaValue.Schema.ToString());
                         result["status"] = uaValue.StatusCode?.ToString() ?? "";
-                        result["deadBand"] = await _UAClient.GetDeadBandAsync(serverUrl, varNode);
+                        result["deadBand"] = await _uaClient.GetDeadBandAsync(serverUrl, varNode);
                         result["minimumSamplingInterval"] = varNode.MinimumSamplingInterval;
                         break;
                     case NodeClass.Object:
-                        result["type"] = await _UAClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
+                        result["type"] = await _uaClient.IsFolderTypeAsync(serverUrl, decodedNodeId) ? "folder" : "object";
                         break;
                 }
 
                 var linkedNodes = new JArray();
-                var refDescriptions = await _UAClient.BrowseAsync(serverUrl, decodedNodeId);
+                var refDescriptions = await _uaClient.BrowseAsync(serverUrl, decodedNodeId);
                 foreach (var rd in refDescriptions)
                 {
-                    var refTypeNode = await _UAClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
+                    var refTypeNode = await _uaClient.ReadNodeAsync(serverUrl, rd.ReferenceTypeId);
                     var targetNode = new JObject
                     {
                         ["node-id"] = rd.PlatformNodeId,
@@ -103,7 +103,7 @@ namespace WebPlatform.Controllers
                             targetNode["Type"] = "method";
                             break;
                         case NodeClass.Object:
-                            targetNode["Type"] = await _UAClient.IsFolderTypeAsync(serverUrl, rd.PlatformNodeId)
+                            targetNode["Type"] = await _uaClient.IsFolderTypeAsync(serverUrl, rd.PlatformNodeId)
                                 ? "folder"
                                 : "object";
                             break;
@@ -164,10 +164,10 @@ namespace WebPlatform.Controllers
                     error = "Insert a valid state for a Variable Node."
                 });
 
-            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            if (ds_id < 0 || ds_id >= _uaServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
-            var serverUrl = _UAServers[ds_id].Url;
-            if (!(await _UAClient.IsServerAvailable(serverUrl)))
+            var serverUrl = _uaServers[ds_id].Url;
+            if (!(await _uaClient.IsServerAvailable(serverUrl)))
                 return StatusCode(500, new
                 {
                     error = "Data Set " + ds_id + " NotAvailable"
@@ -178,7 +178,7 @@ namespace WebPlatform.Controllers
             Node sourceNode;
             try
             {
-                sourceNode = await _UAClient.ReadNodeAsync(serverUrl, decodedNodeId);
+                sourceNode = await _uaClient.ReadNodeAsync(serverUrl, decodedNodeId);
             }
             catch (ServiceResultException exc)
             {
@@ -227,7 +227,7 @@ namespace WebPlatform.Controllers
             
             try
             {
-                await _UAClient.WriteNodeValueAsync(serverUrl, variableNode, state);
+                await _uaClient.WriteNodeValueAsync(serverUrl, variableNode, state);
             }
             catch(ValueToWriteTypeException exc)
             {
@@ -272,7 +272,7 @@ namespace WebPlatform.Controllers
         [HttpPost("data-sets/{ds_id:int}/monitor")]
         public async Task<IActionResult> Monitor(int ds_id, [FromBody] MonitorParams monitorParams)
         {
-            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            if (ds_id < 0 || ds_id >= _uaServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
             if (monitorParams == null || !monitorParams.IsValid())
             {
@@ -301,11 +301,11 @@ namespace WebPlatform.Controllers
                 }
             }
             
-            var serverUrl = _UAServers[ds_id].Url;
+            var serverUrl = _uaServers[ds_id].Url;
             bool[] results;
             try 
             {
-                results = await _UAClient.CreateMonitoredItemsAsync(serverUrl, 
+                results = await _uaClient.CreateMonitoredItemsAsync(serverUrl, 
                     monitorParams.MonitorableNodes, 
                     monitorParams.BrokerUrl, 
                     monitorParams.Topic);
@@ -345,7 +345,7 @@ namespace WebPlatform.Controllers
         [HttpPost("data-sets/{ds_id:int}/stop-monitor")]
         public async Task<IActionResult> StopMonitor(int ds_id, [FromBody] StopMonitorParams stopMonitorParams)
         {
-            if (ds_id < 0 || ds_id >= _UAServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
+            if (ds_id < 0 || ds_id >= _uaServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
             
             if (stopMonitorParams == null || !stopMonitorParams.IsValid())
             {
@@ -355,8 +355,8 @@ namespace WebPlatform.Controllers
                 });
             }
             
-            var serverUrl = _UAServers[ds_id].Url;
-            var result = await _UAClient.DeleteMonitoringPublish(serverUrl, stopMonitorParams.BrokerUrl,
+            var serverUrl = _uaServers[ds_id].Url;
+            var result = await _uaClient.DeleteMonitoringPublish(serverUrl, stopMonitorParams.BrokerUrl,
                     stopMonitorParams.Topic);
 
             if (result)

@@ -33,7 +33,7 @@ namespace WebPlatform.OPCUALayer
     {
         private ApplicationConfiguration _appConfiguration { get; }
         
-        //A Dictionary containing al the activ Sessions, indexed per server Id.
+        //A Dictionary containing al the active Sessions, indexed per server Id.
         private readonly Dictionary<string, Session> _sessions;
         
         private readonly Dictionary<string, List<MonitorPublishInfo>> _monitorPublishInfo;
@@ -166,17 +166,23 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
-            Session session;
+            /*Session session;
+            
             if (!_sessions.ContainsKey(serverUrlstring))
             {
                 var endpoints = new List<Endpoint>();
-                var endpoint_id = 0;
+                var endpointId = 0;
                 try
                 {
-                    foreach (EndpointDescription s in GetEndpointNames(new Uri(serverUrlstring)))
+                    foreach (EndpointDescription endpointDescription in GetEndpointNames(new Uri(serverUrlstring)))
                     {
-                        endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
-                        endpoint_id++;
+                        endpoints.Add(new Endpoint(endpointId, 
+                            endpointDescription.EndpointUrl, 
+                            endpointDescription.SecurityMode.ToString(), 
+                            endpointDescription.SecurityLevel.ToString(), 
+                            endpointDescription.SecurityPolicyUri));
+                        
+                        endpointId++;
                     }
                 }
                 catch (ServiceResultException)
@@ -188,7 +194,10 @@ namespace WebPlatform.OPCUALayer
                 await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
             }
 
-            session = _sessions[serverUrlstring];
+            session = _sessions[serverUrlstring];*/
+            
+            var session = await GetSessionByUrlAsync(serverUrlstring);
+            
             DataValue serverStatus;
             try
             {
@@ -200,9 +209,7 @@ namespace WebPlatform.OPCUALayer
             }
             //If StatusCode of the Variable read is not Good or if the Value is not equal to Running (0)
             //the OPC UA Server is not available
-            if (DataValue.IsNotGood(serverStatus) || (int)serverStatus.Value != 0)
-                return false;
-            return true;
+            return !DataValue.IsNotGood(serverStatus) && (int)serverStatus.Value == 0;
         }
         
         public async Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode)
@@ -402,15 +409,20 @@ namespace WebPlatform.OPCUALayer
         /// <returns></returns>
         private async Task<bool> RestoreSessionAsync(string serverUrlstring)
         {
-            _sessions.Remove(serverUrlstring);
+            lock (_sessions)
+            {
+                if(_sessions.ContainsKey(serverUrlstring))
+                    _sessions.Remove(serverUrlstring);
+            }
+            
             var endpoints = new List<Endpoint>();
-            var endpoint_id = 0;
+            var endpointId = 0;
             try
             {
                 foreach (EndpointDescription s in GetEndpointNames(new Uri(serverUrlstring)))
                 {
-                    endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
-                    endpoint_id++;
+                    endpoints.Add(new Endpoint(endpointId, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
+                    endpointId++;
                 }
                 await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
             }
@@ -423,30 +435,28 @@ namespace WebPlatform.OPCUALayer
 
         private async Task<Session> GetSessionByUrlAsync(string url)
         {
-            if (_sessions.ContainsKey(url))
-                return _sessions[url];
-
-            else
+            lock (_sessions)
             {
-                var endpoints = new List<Endpoint>();
-                var endpoint_id = 0;
-                try
-                {
-                    foreach (EndpointDescription s in GetEndpointNames(new Uri(url)))
-                    {
-                        endpoints.Add(new Endpoint(endpoint_id, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
-                        endpoint_id++;
-                    }
-                }
-                catch (ServiceResultException)
-                {
-                    throw new DataSetNotAvailableException();
-                }
-                //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
-                #warning Indice fisso a 0
-                return await CreateSessionAsync(url, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
-
+                if (_sessions.ContainsKey(url))
+                    return _sessions[url];
             }
+
+            var endpoints = new List<Endpoint>();
+            var endpointId = 0;
+            try
+            {
+                foreach (EndpointDescription endpointDescription in GetEndpointNames(new Uri(url)))
+                {
+                    endpoints.Add(new Endpoint(endpointId, endpointDescription.EndpointUrl, endpointDescription.SecurityMode.ToString(), endpointDescription.SecurityLevel.ToString(), endpointDescription.SecurityPolicyUri));
+                    endpointId++;
+                }
+            }
+            catch (ServiceResultException)
+            {
+                throw new DataSetNotAvailableException();
+            }
+            //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
+            return await CreateSessionAsync(url, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
         }
 
         private async Task<Session> CreateSessionAsync(string serverUrl, string endpointUrl, string securityMode, string securityPolicy)
@@ -454,16 +464,16 @@ namespace WebPlatform.OPCUALayer
             await _appConfiguration.Validate(ApplicationType.Client);
             _appConfiguration.CertificateValidator.CertificateValidation += CertificateValidator_CertificateValidation;
 
-            var endpointDescription = new EndpointDescription(endpointUrl);
-            endpointDescription.SecurityMode = (MessageSecurityMode)Enum.Parse(typeof(MessageSecurityMode), securityMode, true);
-            endpointDescription.SecurityPolicyUri = securityPolicy;
+            var endpointDescription = new EndpointDescription(endpointUrl)
+            {
+                SecurityMode = (MessageSecurityMode) Enum.Parse(typeof(MessageSecurityMode), securityMode, true),
+                SecurityPolicyUri = securityPolicy
+            };
 
             var endpointConfiguration = EndpointConfiguration.Create(_appConfiguration);
 
             var endpoint = new ConfiguredEndpoint(endpointDescription.Server, endpointConfiguration);
             endpoint.Update(endpointDescription);
-
-            Console.WriteLine($"Creo la sessione con {endpointDescription.Server} \n\tSecurityMode: {endpointDescription.SecurityMode}\n\tSecurityPolicy: {endpointDescription.SecurityPolicyUri}");
 
             var s = await Session.Create(_appConfiguration,
                                              endpoint,
@@ -473,8 +483,13 @@ namespace WebPlatform.OPCUALayer
                                              (uint)_appConfiguration.ClientConfiguration.DefaultSessionTimeout,
                                              null,
                                              null);
-
-            _sessions.Add(serverUrl, s);
+            
+            lock (_sessions)
+            {
+                if (_sessions.ContainsKey(serverUrl))
+                    s = _sessions[serverUrl];
+                _sessions.Add(serverUrl, s);
+            }
 
             return s;
         }
