@@ -12,15 +12,18 @@ namespace WebPlatform.Monitoring.MQTT
         
         public MqttPublisher(string mqtturl)
         {
-            if (ClientsDict.ContainsKey(mqtturl))
+            lock (ClientsDict)
             {
-                _mClient = ClientsDict[mqtturl];
-            }
-            else
-            {
-                _mClient = new MqttClient(mqtturl);
-                _mClient.Connect("OPC-WebApi");
-                ClientsDict.Add(mqtturl, _mClient);
+                if (ClientsDict.ContainsKey(mqtturl))
+                {
+                    _mClient = ClientsDict[mqtturl];
+                }
+                else
+                {
+                    _mClient = new MqttClient(mqtturl);
+                    _mClient.Connect("OPC-WebApi");
+                    ClientsDict.Add(mqtturl, _mClient);
+                }
             }
         }
         
