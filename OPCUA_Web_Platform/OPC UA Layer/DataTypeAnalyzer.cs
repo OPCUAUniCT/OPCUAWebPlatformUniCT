@@ -32,9 +32,6 @@ namespace WebPlatform.OPCUALayer
             Type tipo = Type.GetType("Opc.Ua." + type + ", Opc.Ua.Core");
             BuiltInType builtInType =  TypeInfo.GetBuiltInType(TypeInfo.GetDataTypeId(tipo));
             return builtInType;
-            
-            
-            //return Enum.TryParse(type, true, out BuiltInType builtInType) ? builtInType : BuiltInType.Null;
         }
 
         private static BuiltInType GetBuiltinTypeFromBinaryTypeName(string type)
