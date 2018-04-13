@@ -744,7 +744,7 @@ namespace WebPlatform.OPCUALayer
                     
                     return parser.Parse(descriptionId, (ExtensionObject) value.Value, _session.MessageContext, generateSchema);
                 }
-                
+
                 var structStandard = ((ExtensionObject)value.Value).Body;
                 var jValue = JObject.FromObject(structStandard);
                 var schema4 = generateSchema ? JsonSchema4.FromSampleJson(jValue.ToString()) : null;
@@ -779,7 +779,7 @@ namespace WebPlatform.OPCUALayer
                 }
                 else
                 {
-                    var structArray = ((ExtensionObject[])value.Value);
+                    var structArray = ((ExtensionObject[])value.Value).Select(s=> s.Body);
                     var jArray = JArray.FromObject(structArray);
                     var schema4 = generateSchema ? JsonSchema4.FromSampleJson(jArray.ToString()) : null;
                     var jSchema = generateSchema ? JSchema.Parse(schema4.ToJson()) : null;

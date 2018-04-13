@@ -162,18 +162,20 @@ namespace WebPlatform.OPCUALayer
             MethodInfo mInfo = typeof(BinaryDecoder).GetMethod(methodToCall, new[] { typeof(string) });
             if (builtinType == BuiltInType.ByteString)
             {
-                Object byteStringObject = mInfo.Invoke(_bd, new object[] { "" });
-                byte[] byteString = byteStringObject as byte[];
+                byte[] byteString = mInfo.Invoke(_bd, new object[] { "" }) as byte[];
                 var base64ByteString = Convert.ToBase64String(byteString);
                 return base64ByteString;
             }
             if (builtinType == BuiltInType.Guid)
             {
-                Object guidObject = mInfo.Invoke(_bd, new object[] { "" });
-                string guid = guidObject.ToString();
+                string guid = mInfo.Invoke(_bd, new object[] { "" }).ToString();
                 return guid;
             }
-                
+            if (builtinType == BuiltInType.ExtensionObject)
+            {
+                ExtensionObject extObject = mInfo.Invoke(_bd, new object[] { "" }) as ExtensionObject;
+                return extObject.Body;
+            }
 
             return mInfo.Invoke(_bd, new object[] { "" });
         }
