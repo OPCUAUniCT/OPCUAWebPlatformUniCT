@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mime;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using WebPlatform.Extensions;
 using Opc.Ua;
 using Opc.Ua.Client;
+using Opc.Ua.Configuration;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
 using WebPlatform.Monitoring;
@@ -31,51 +33,38 @@ namespace WebPlatform.OPCUALayer
 
     public class UaClient : IUaClientSingleton
     {
-        private ApplicationConfiguration _appConfiguration { get; }
-        
+        private readonly ApplicationInstance _application;
+        private ApplicationConfiguration _appConfiguration;
+        private bool _autoAccept;
+
         //A Dictionary containing al the active Sessions, indexed per server Id.
         private readonly Dictionary<string, Session> _sessions;
-        
         private readonly Dictionary<string, List<MonitorPublishInfo>> _monitorPublishInfo;
-
-        private struct Endpoint
-        {
-            public int EndpointId { get; set; }
-            public string EndpointUrl { get; set; }
-            public string SecurityMode { get; set; }
-            public string SecurityLevel { get; set; }
-            public string SecurityPolicyUri { get; set; }
-
-
-            public Endpoint(int id, string url, string securityMode, string securityLevel, string securityPolicyUri)
-            {
-                EndpointId = id;
-                EndpointUrl = url;
-                SecurityMode = securityMode;
-                SecurityLevel = securityLevel;
-                SecurityPolicyUri = securityPolicyUri;
-            }
-        }
 
         public UaClient()
         {
-            _appConfiguration = CreateAppConfiguration("OPCUAWebPlatform", 60000);
+            _application = new ApplicationInstance
+            {
+                ApplicationName = "OPCUAWebPlatform",
+                ApplicationType = ApplicationType.Client,
+                ConfigSectionName = "OPCUAWebPlatform"
+            };
+            
             _sessions = new Dictionary<string, Session>();
             _monitorPublishInfo = new Dictionary<string, List<MonitorPublishInfo>>();
         }
 
         public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
-            Node node;
-            node = session.ReadNode(nodeToRead);
+            var node = session.ReadNode(nodeToRead);
             return node;
         }
 
         public async Task<Node> ReadNodeAsync(string serverUrl, NodeId nodeToRead)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             Node node;
             node = session.ReadNode(nodeToRead);
             return node;
@@ -84,7 +73,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> WriteNodeValueAsync(string serverUrl, VariableNode variableNode, VariableState state)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             var typeManager = new DataTypeManager(session);
             WriteValueCollection writeValues = new WriteValueCollection();
             
@@ -97,8 +86,8 @@ namespace WebPlatform.OPCUALayer
 
             writeValues.Add(writeValue);
             StatusCodeCollection results = new StatusCodeCollection();
-            DiagnosticInfoCollection diagnosticInfos = new DiagnosticInfoCollection();
-            session.Write(null, writeValues, out results, out diagnosticInfos);
+            
+            session.Write(null, writeValues, out results, out _);
             if (!StatusCode.IsGood(results[0])) {
                 if (results[0] == StatusCodes.BadTypeMismatch)
                     throw new ValueToWriteTypeException("Wrong Type Error: data sent are not of the type expected. Check your data and try again");
@@ -109,7 +98,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<IEnumerable<EdgeDescription>> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeToBrowseIdStr);
 
             var browser = new Browser(session)
@@ -129,7 +118,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> IsFolderTypeAsync(string serverUrl, string nodeIdStr)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeIdStr);
 
             //Set a Browser object to follow HasTypeDefinition Reference only
@@ -158,7 +147,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<UaValue> ReadUaValueAsync(string serverUrl, VariableNode variableNode)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             var typeManager = new DataTypeManager(session);
 
             return typeManager.GetUaValue(variableNode);
@@ -166,7 +155,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
-            var session = await GetSessionByUrlAsync(serverUrlstring);
+            var session = await GetSessionAsync(serverUrlstring);
             
             DataValue serverStatus;
             try
@@ -185,7 +174,7 @@ namespace WebPlatform.OPCUALayer
         
         public async Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             var dataTypeId = varNode.DataType;
 
             var browse = new Browser(session)
@@ -220,7 +209,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
             string brokerUrl, string topic)
         {
-            Session session = await GetSessionByUrlAsync(serverUrl);
+            Session session = await GetSessionAsync(serverUrl);
             
             MonitoredItem mi = null;
             MonitorPublishInfo monitorInfo = null;
@@ -311,7 +300,7 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> DeleteMonitoringPublish(string serverUrl, string brokerUrl, string topic)
         {
-            var session = await GetSessionByUrlAsync(serverUrl);
+            var session = await GetSessionAsync(serverUrl);
 
             lock (_monitorPublishInfo)
             {
@@ -397,16 +386,9 @@ namespace WebPlatform.OPCUALayer
                     _sessions.Remove(serverUrlstring);
             }
             
-            var endpoints = new List<Endpoint>();
-            var endpointId = 0;
             try
             {
-                foreach (EndpointDescription s in GetEndpointNames(new Uri(serverUrlstring)))
-                {
-                    endpoints.Add(new Endpoint(endpointId, s.EndpointUrl, s.SecurityMode.ToString(), s.SecurityLevel.ToString(), s.SecurityPolicyUri));
-                    endpointId++;
-                }
-                await CreateSessionAsync(serverUrlstring, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
+                await GetSessionAsync(serverUrlstring);
             }
             catch (ServiceResultException)
             {
@@ -415,47 +397,26 @@ namespace WebPlatform.OPCUALayer
             return true;
         }
 
-        private async Task<Session> GetSessionByUrlAsync(string url)
-        {
-            lock (_sessions)
-            {
-                if (_sessions.ContainsKey(url))
-                    return _sessions[url];
-            }
-
-            var endpoints = new List<Endpoint>();
-            var endpointId = 0;
-            try
-            {
-                foreach (EndpointDescription endpointDescription in GetEndpointNames(new Uri(url)))
-                {
-                    endpoints.Add(new Endpoint(endpointId, endpointDescription.EndpointUrl, endpointDescription.SecurityMode.ToString(), endpointDescription.SecurityLevel.ToString(), endpointDescription.SecurityPolicyUri));
-                    endpointId++;
-                }
-            }
-            catch (ServiceResultException)
-            {
-                throw new DataSetNotAvailableException();
-            }
-            //TODO: Prende sempre l'endpoint 0, verificare chi o cosa è.
-            return await CreateSessionAsync(url, endpoints[0].EndpointUrl, endpoints[0].SecurityMode, endpoints[0].SecurityPolicyUri);
-        }
-
-        private async Task<Session> CreateSessionAsync(string serverUrl, string endpointUrl, string securityMode, string securityPolicy)
+        private async Task<Session> GetSessionAsync(string serverUrl)
         {
             lock (_sessions)
             {
                 if (_sessions.ContainsKey(serverUrl)) return _sessions[serverUrl];
             }
-            
-            await _appConfiguration.Validate(ApplicationType.Client);
-            _appConfiguration.CertificateValidator.CertificateValidation += CertificateValidator_CertificateValidation;
 
-            var endpointDescription = new EndpointDescription(endpointUrl)
+            await CheckAndLoadConfiguration();
+            EndpointDescription endpointDescription;
+            try
             {
-                SecurityMode = (MessageSecurityMode) Enum.Parse(typeof(MessageSecurityMode), securityMode, true),
-                SecurityPolicyUri = securityPolicy
-            };
+                endpointDescription = CoreClientUtils.SelectEndpoint(serverUrl, true, 15000);
+            }
+            catch (Exception e)
+            {
+                throw new DataSetNotAvailableException();
+            }
+            
+            Console.WriteLine("    Selected endpoint uses: {0}",
+                endpointDescription.SecurityPolicyUri.Substring(endpointDescription.SecurityPolicyUri.LastIndexOf('#') + 1));
 
             var endpointConfiguration = EndpointConfiguration.Create(_appConfiguration);
 
@@ -482,62 +443,37 @@ namespace WebPlatform.OPCUALayer
             return s;
         }
 
-        private ApplicationConfiguration CreateAppConfiguration(string applicationName, int sessionTimeout)
+        private async Task CheckAndLoadConfiguration()
         {
-            var config = new ApplicationConfiguration()
+            if (_appConfiguration == null)
             {
-                ApplicationName = applicationName,
-                ApplicationType = ApplicationType.Client,
-                ApplicationUri = "urn:localhost:OPCFoundation:" + applicationName,
-                SecurityConfiguration = new SecurityConfiguration
+                _appConfiguration = await _application.LoadApplicationConfiguration(false);
+                
+                var haveAppCertificate = await _application.CheckApplicationInstanceCertificate(false, 0);
+                if (!haveAppCertificate)
                 {
-                    ApplicationCertificate = new CertificateIdentifier
-                    {
-                        StoreType = "Directory",
-                        StorePath = "./OPC Foundation/CertificateStores/MachineDefault",
-                        SubjectName = Utils.Format("CN={0}, DC={1}", applicationName, Utils.GetHostName())
-                    },
-                    TrustedPeerCertificates = new CertificateTrustList
-                    {
-                        StoreType = "Directory",
-                        StorePath = "./OPC Foundation/CertificateStores/UA Applications",
-                    },
-                    TrustedIssuerCertificates = new CertificateTrustList
-                    {
-                        StoreType = "Directory",
-                        StorePath = "./OPC Foundation/CertificateStores/UA Certificate Authorities",
-                    },
-                    RejectedCertificateStore = new CertificateTrustList
-                    {
-                        StoreType = "Directory",
-                        StorePath = "./OPC Foundation/CertificateStores/RejectedCertificates",
-                    },
-                    NonceLength = 32,
-                    AutoAcceptUntrustedCertificates = true
-                },
-                TransportConfigurations = new TransportConfigurationCollection(),
-                TransportQuotas = new TransportQuotas { OperationTimeout = 15000 },
-                ClientConfiguration = new ClientConfiguration { DefaultSessionTimeout = sessionTimeout }
-            };
+                    throw new Exception("Application instance certificate invalid!");
+                }
 
-            return config;
+                _appConfiguration.ApplicationUri =
+                    Utils.GetApplicationUriFromCertificate(_appConfiguration.SecurityConfiguration.ApplicationCertificate
+                        .Certificate);
+                if (_appConfiguration.SecurityConfiguration.AutoAcceptUntrustedCertificates)
+                {
+                    _autoAccept = true;
+                }
+
+                _appConfiguration.CertificateValidator.CertificateValidation += CertificateValidator_CertificateValidation;
+            }
         }
 
         private void CertificateValidator_CertificateValidation(CertificateValidator sender, CertificateValidationEventArgs e)
         {
-            Console.WriteLine("Accepted Certificate: {0}", e.Certificate.Subject);
-            e.Accept = (e.Error.StatusCode == StatusCodes.BadCertificateUntrusted);
-        }
-
-        private EndpointDescriptionCollection GetEndpointNames(Uri serverURI)
-        {
-            EndpointConfiguration configuration = EndpointConfiguration.Create(_appConfiguration);
-            configuration.OperationTimeout = 10;
-
-            using (DiscoveryClient client = DiscoveryClient.Create(serverURI, EndpointConfiguration.Create(_appConfiguration)))
+            if (e.Error.StatusCode == StatusCodes.BadCertificateUntrusted)
             {
-                EndpointDescriptionCollection endpoints = client.GetEndpoints(null);
-                return endpoints;
+                e.Accept = _autoAccept;
+                Console.WriteLine(_autoAccept ? "Accepted Certificate: {0}" : "Rejected Certificate: {0}",
+                    e.Certificate.Subject);
             }
         }
 
