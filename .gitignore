@@ -1,9 +1,6 @@
 # Autosave files
 *~
 
-# Certificates
-OPCUA_Web_Platform/OPC Foundation/**
-
 # build
 [Oo]bj/
 [Bb]in/

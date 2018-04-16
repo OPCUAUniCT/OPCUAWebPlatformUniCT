@@ -5,7 +5,7 @@
         schemaLocation="./Schema/ApplicationConfiguration.xsd"
 >
     <ApplicationName>OPCUAWebPlatform</ApplicationName>
-    <ApplicationUri>urn:localhost:OPCFoundation:OPCUAWebPlatform</ApplicationUri>
+    <ApplicationUri>urn:localhost:OPCUAWebPlatform</ApplicationUri>
     <ApplicationType>Client_1</ApplicationType>
 
     <SecurityConfiguration>

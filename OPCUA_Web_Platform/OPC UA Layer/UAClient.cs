@@ -45,7 +45,6 @@ namespace WebPlatform.OPCUALayer
         {
             _application = new ApplicationInstance
             {
-                ApplicationName = "OPCUAWebPlatform",
                 ApplicationType = ApplicationType.Client,
                 ConfigSectionName = "OPCUAWebPlatform"
             };
