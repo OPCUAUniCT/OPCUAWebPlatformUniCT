@@ -2735,21 +2735,36 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is a Object
                 if (state.Value.Type != JTokenType.Object)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object but received a JSON " + state.Value.Type);
-                var analyzer = new DataTypeAnalyzer(_session);
-                var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
-                var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
-                //TODO: A cache for the dictionary could be implemented in order to improve performances
-                string dictionary = analyzer.GetDictionary(descriptionNodeId);
 
-                //Retrieve a key that will be used by the Parser. As explained in the specification Part 3, 
-                //the value of DataTypeDescription variable contains the description identifier in the 
-                //DataTypeDictionary value which describe the data structure.
-                string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+                if (variableNode.DataType.NamespaceIndex != 0)
+                {
+                    var analyzer = new DataTypeAnalyzer(_session);
+                    var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
+                    var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                    //TODO: A cache for the dictionary could be implemented in order to improve performances
+                    string dictionary = analyzer.GetDictionary(descriptionNodeId);
 
-                StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
-                var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, state.Value.ToObject<JObject>(), _session.MessageContext, encodingNodeId);
-                
-                return new DataValue(new Variant(value));
+                    //Retrieve a key that will be used by the Parser. As explained in the specification Part 3, 
+                    //the value of DataTypeDescription variable contains the description identifier in the 
+                    //DataTypeDictionary value which describe the data structure.
+                    string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+
+                    StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
+                    var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, state.Value.ToObject<JObject>(), _session.MessageContext, encodingNodeId);
+
+                    return new DataValue(new Variant(value));
+                }
+                else
+                {
+                    Type mType = TypeInfo.GetSystemType(variableNode.DataType, _session.Factory);
+                    foreach (var field in mType.GetFields())
+                    {
+                        field.Name.ToString();
+                    }
+                    var a = state.Value.ToString();
+                    var value = JsonConvert.DeserializeObject(a, mType);
+                    return new DataValue(new Variant(value));
+                }
             }
             else if (variableNode.ValueRank == 1)
             {
