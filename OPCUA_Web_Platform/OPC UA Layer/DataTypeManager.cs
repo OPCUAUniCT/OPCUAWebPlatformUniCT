@@ -466,7 +466,7 @@ namespace WebPlatform.OPCUALayer
             if (variableNode.ValueRank == -1)
             {
                 var diagnosticInfo = (DiagnosticInfo)value.Value;
-                var code = new PlatformStatusCode(diagnosticInfo.InnerStatusCode).code;
+                var code = new PlatformStatusCode(diagnosticInfo.InnerStatusCode);
                 var diagnosticInfoValue = new
                 {
                     diagnosticInfo.SymbolicId,
@@ -474,7 +474,11 @@ namespace WebPlatform.OPCUALayer
                     diagnosticInfo.Locale,
                     diagnosticInfo.LocalizedText,
                     diagnosticInfo.AdditionalInfo,
-                    InnerStatusCode = code,
+                    InnerStatusCode = new
+                    {
+                        code.code,
+                        code.structureChanged
+                    },
                     InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnosticInfo)
                 };
                 var jStringVal = JObject.Parse(JsonConvert.SerializeObject(diagnosticInfoValue));
@@ -489,7 +493,15 @@ namespace WebPlatform.OPCUALayer
                         { "Locale", new JSchema { Type = JSchemaType.Integer } },
                         { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
                         { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
-                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.Object, Properties = {
+                                { "Code", new JSchema
+                                    { 
+                                        Type = JSchemaType.String, 
+                                        Enum = { "Good", "Uncertain", "Bad" } 
+                                    } 
+                                },
+                                { "StructureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                            }}},
                         { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
                     }
                 } : null;
@@ -502,7 +514,7 @@ namespace WebPlatform.OPCUALayer
                 var diagnosticInfos = (DiagnosticInfo[])value.Value;
                 foreach (var diagnInfo in diagnosticInfos)
                 {
-                    var code = new PlatformStatusCode(diagnInfo.InnerStatusCode).code;
+                    var code = new PlatformStatusCode(diagnInfo.InnerStatusCode);
                     jArray.Add(JObject.Parse(JsonConvert.SerializeObject(new
                     {
                         diagnInfo.SymbolicId,
@@ -510,7 +522,11 @@ namespace WebPlatform.OPCUALayer
                         diagnInfo.Locale,
                         diagnInfo.LocalizedText,
                         diagnInfo.AdditionalInfo,
-                        InnerStatusCode = code,
+                        InnerStatusCode = new
+                        {
+                            code.code,
+                            code.structureChanged
+                        },
                         InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnInfo)
                     })));
                 }
@@ -525,7 +541,15 @@ namespace WebPlatform.OPCUALayer
                         { "Locale", new JSchema { Type = JSchemaType.Integer } },
                         { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
                         { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
-                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.Object, Properties = {
+                            { "Code", new JSchema
+                                { 
+                                    Type = JSchemaType.String, 
+                                    Enum = { "Good", "Uncertain", "Bad" } 
+                                } 
+                            },
+                            { "StructureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                        }}},
                         { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
                     }
                 }) : null;
@@ -539,7 +563,7 @@ namespace WebPlatform.OPCUALayer
                 var diagnInfoRepresentation = new dynamic[matrix.Elements.Length];
                 for (var i = 0; i < diagnInfos.Length; i++)
                 {
-                    var code = new PlatformStatusCode(diagnInfos[i].InnerStatusCode).code;
+                    var code = new PlatformStatusCode(diagnInfos[i].InnerStatusCode);
                     diagnInfoRepresentation[i] = new
                     {
                         diagnInfos[i].SymbolicId,
@@ -547,7 +571,11 @@ namespace WebPlatform.OPCUALayer
                         diagnInfos[i].Locale,
                         diagnInfos[i].LocalizedText,
                         diagnInfos[i].AdditionalInfo,
-                        InnerStatusCode = code,
+                        InnerStatusCode = new
+                        {
+                            code.code,
+                            code.structureChanged
+                        },
                         InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnInfos[i])
                     };
                 }
@@ -566,7 +594,15 @@ namespace WebPlatform.OPCUALayer
                         { "Locale", new JSchema { Type = JSchemaType.Integer } },
                         { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
                         { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
-                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.Object, Properties = {
+                            { "Code", new JSchema
+                                { 
+                                    Type = JSchemaType.String, 
+                                    Enum = { "Good", "Uncertain", "Bad" } 
+                                } 
+                            },
+                            { "StructureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                        }}},
                         { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
                     }
                 }) : null;
