@@ -1,12 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 using Newtonsoft.Json.Schema.Generation;
 using NJsonSchema;
+using NJsonSchema.Infrastructure;
 using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Exceptions;
@@ -58,8 +64,10 @@ namespace WebPlatform.OPCUALayer
                     case BuiltInType.Double:
                         return SerializeDouble(variableNode, value, generateSchema);
                     case BuiltInType.String:  case BuiltInType.DateTime: 
-                    case BuiltInType.Guid:    case BuiltInType.DiagnosticInfo:
+                    case BuiltInType.Guid:
                         return SerializeString(variableNode, value, generateSchema);
+                    case BuiltInType.DiagnosticInfo :
+                        return SerializeDiagnosticInfo(variableNode, value, generateSchema);
                     case BuiltInType.LocalizedText:
                         return SerializeLocalizedText(variableNode, value, generateSchema);
                     case BuiltInType.NodeId: 
@@ -318,13 +326,13 @@ namespace WebPlatform.OPCUALayer
                 Type = JSchemaType.Object,
                 Properties =
                 {
-                    { "code", new JSchema
+                    { "Code", new JSchema
                         { 
                             Type = JSchemaType.String, 
                             Enum = { "Good", "Uncertain", "Bad" } 
                         } 
                     },
-                    { "structureChanged", new JSchema{ Type = JSchemaType.Boolean } }
+                    { "StructureChanged", new JSchema{ Type = JSchemaType.Boolean } }
                 }
             } : null;
             
@@ -452,7 +460,121 @@ namespace WebPlatform.OPCUALayer
                 return new UaValue(jArr, outerSchema);
             }
         }
+        
+        private UaValue SerializeDiagnosticInfo(VariableNode variableNode, Variant value, bool generateSchema)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                var diagnosticInfo = (DiagnosticInfo)value.Value;
+                var code = new PlatformStatusCode(diagnosticInfo.InnerStatusCode).code;
+                var diagnosticInfoValue = new
+                {
+                    diagnosticInfo.SymbolicId,
+                    diagnosticInfo.NamespaceUri,
+                    diagnosticInfo.Locale,
+                    diagnosticInfo.LocalizedText,
+                    diagnosticInfo.AdditionalInfo,
+                    InnerStatusCode = code,
+                    InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnosticInfo)
+                };
+                var jStringVal = JObject.Parse(JsonConvert.SerializeObject(diagnosticInfoValue));
+                
+                var schema = generateSchema ? new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Id = new Uri("$diagn_info"),
+                    Properties = {
+                        { "SymbolicId", new JSchema { Type = JSchemaType.Integer } },
+                        { "NamespaceUri", new JSchema { Type = JSchemaType.Integer } },
+                        { "Locale", new JSchema { Type = JSchemaType.Integer } },
+                        { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
+                        { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
+                    }
+                } : null;
+                return new UaValue(jStringVal, schema);
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var jArray = new JArray();
+                
+                var diagnosticInfos = (DiagnosticInfo[])value.Value;
+                foreach (var diagnInfo in diagnosticInfos)
+                {
+                    var code = new PlatformStatusCode(diagnInfo.InnerStatusCode).code;
+                    jArray.Add(JObject.Parse(JsonConvert.SerializeObject(new
+                    {
+                        diagnInfo.SymbolicId,
+                        diagnInfo.NamespaceUri,
+                        diagnInfo.Locale,
+                        diagnInfo.LocalizedText,
+                        diagnInfo.AdditionalInfo,
+                        InnerStatusCode = code,
+                        InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnInfo)
+                    })));
+                }
+                
+                var schema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(new int[] { diagnosticInfos.Length }, new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Id = new Uri("$diagn_info"),
+                    Properties = {
+                        { "SymbolicId", new JSchema { Type = JSchemaType.Integer } },
+                        { "NamespaceUri", new JSchema { Type = JSchemaType.Integer } },
+                        { "Locale", new JSchema { Type = JSchemaType.Integer } },
+                        { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
+                        { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
+                    }
+                }) : null;
 
+                return new UaValue(jArray, schema);
+            }
+            else
+            {
+                var matrix = (Matrix)value.Value;
+                var diagnInfos = (DiagnosticInfo[])matrix.Elements;
+                var diagnInfoRepresentation = new dynamic[matrix.Elements.Length];
+                for (var i = 0; i < diagnInfos.Length; i++)
+                {
+                    var code = new PlatformStatusCode(diagnInfos[i].InnerStatusCode).code;
+                    diagnInfoRepresentation[i] = new
+                    {
+                        diagnInfos[i].SymbolicId,
+                        diagnInfos[i].NamespaceUri,
+                        diagnInfos[i].Locale,
+                        diagnInfos[i].LocalizedText,
+                        diagnInfos[i].AdditionalInfo,
+                        InnerStatusCode = code,
+                        InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnInfos[i])
+                    };
+                }
+
+                var arr = (new Matrix(diagnInfoRepresentation, BuiltInType.DiagnosticInfo, matrix.Dimensions)).ToArray();
+                var arrStr = JsonConvert.SerializeObject(arr);
+                var jArr = JArray.Parse(arrStr);
+
+                var outerSchema = generateSchema ? DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, new JSchema()
+                {
+                    Type = JSchemaType.Object,
+                    Id = new Uri("$diagn_info"),
+                    Properties = {
+                        { "SymbolicId", new JSchema { Type = JSchemaType.Integer } },
+                        { "NamespaceUri", new JSchema { Type = JSchemaType.Integer } },
+                        { "Locale", new JSchema { Type = JSchemaType.Integer } },
+                        { "LocalizedText", new JSchema { Type = JSchemaType.Integer } },
+                        { "AdditionalInfo", new JSchema { Type = JSchemaType.String } },
+                        { "InnerStatusCode", new JSchema { Type = JSchemaType.String } },
+                        { "InnerDiagnosticInfo", new JSchema { Reference = new Uri("$diagn_info") } }
+                    }
+                }) : null;
+
+                return new UaValue(jArr, outerSchema);
+            }
+        }
+    
         private UaValue SerializeLocalizedText(VariableNode variableNode, Variant value, bool generateSchema)
         {
             if (variableNode.ValueRank == -1)
@@ -514,7 +636,7 @@ namespace WebPlatform.OPCUALayer
                     };
                 }
 
-                var arr = (new Matrix(locTextsRepresentation, BuiltInType.ExtensionObject, matrix.Dimensions)).ToArray();
+                var arr = (new Matrix(locTextsRepresentation, BuiltInType.LocalizedText, matrix.Dimensions)).ToArray();
                 var arrStr = JsonConvert.SerializeObject(arr);
                 var jArr = JArray.Parse(arrStr);
 
@@ -616,7 +738,7 @@ namespace WebPlatform.OPCUALayer
                     expNodeIdRepresentation[i] = JObject.Parse(JsonConvert.SerializeObject(expNodeId));
                 }
 
-                var arr = (new Matrix(expNodeIdRepresentation, BuiltInType.ExtensionObject, matrix.Dimensions)).ToArray();
+                var arr = (new Matrix(expNodeIdRepresentation, BuiltInType.ExpandedNodeId, matrix.Dimensions)).ToArray();
                 var arrStr = JsonConvert.SerializeObject(arr);
                 var jArr = JArray.Parse(arrStr);
                 return new UaValue(jArr, DataTypeSchemaGenerator.GenerateSchemaForArray(matrix.Dimensions, schema));
@@ -977,6 +1099,27 @@ namespace WebPlatform.OPCUALayer
 
             return array;
         }
+        
+        private dynamic GetInnerDiagnosticInfo(DiagnosticInfo diagnosticInfo)
+        {
+            if (diagnosticInfo == null)
+                return new
+                {
+
+                };
+                    
+            string code = new PlatformStatusCode(diagnosticInfo.InnerStatusCode).code;
+            return new
+            {
+                diagnosticInfo.SymbolicId,
+                diagnosticInfo.NamespaceUri,
+                diagnosticInfo.Locale,
+                diagnosticInfo.LocalizedText,
+                diagnosticInfo.AdditionalInfo,
+                diagnosticInfo.InnerStatusCode,
+                InnerDiagnosticInfo = GetInnerDiagnosticInfo(diagnosticInfo)
+            };
+        }
 
         #endregion
         
@@ -1019,7 +1162,7 @@ namespace WebPlatform.OPCUALayer
                 case BuiltInType.Guid:
                     return GetDataValueFromGuid(variableNode, state);
                 case BuiltInType.DiagnosticInfo:
-                    throw new NotImplementedException("Write of DiagnosticInfo element is not implemented");
+                    return GetDataValueFromDiagnosticInfo(variableNode, state);
                 case BuiltInType.LocalizedText:
                     return GetDataValueFromLocalizedText(variableNode, state);
                 case BuiltInType.NodeId:
@@ -2370,7 +2513,7 @@ namespace WebPlatform.OPCUALayer
                 return new DataValue(new Variant(matrixToWrite));
             }
         }
-
+        
         private DataValue GetDataValueFromLocalizedText(VariableNode variableNode, VariableState state)
         {
             if (variableNode.ValueRank == -1)
@@ -2467,6 +2610,28 @@ namespace WebPlatform.OPCUALayer
 
                 matrixToWrite = new Matrix(valuesToWriteArray, BuiltInType.LocalizedText, dimensions);
                 return new DataValue(new Variant(matrixToWrite));
+            }
+        }
+        
+        private DataValue GetDataValueFromDiagnosticInfo(VariableNode variableNode, VariableState state)
+        {
+            
+            
+            if (variableNode.ValueRank == -1)
+            {
+                var decoder = new PlatformJSONDecoder(state.Value.ToString(), _session.MessageContext);
+                var valueToWrite = decoder.ReadDiagnosticInfo("Value");
+                return new DataValue(new Variant(valueToWrite));
+            }
+            else if (variableNode.ValueRank == 1)
+            {
+                var decoder = new PlatformJSONDecoder(state.Value.ToString(), _session.MessageContext);
+                var valuesToWriteArray = decoder.ReadDiagnosticInfoArray("value");
+                return new DataValue(new Variant(valuesToWriteArray));
+            }
+            else
+            {
+                throw new NotImplementedException("Write of multidimensional DiagnosticInfo is not supported");
             }
         }
 
@@ -2736,6 +2901,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Object)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object but received a JSON " + state.Value.Type);
 
+                var jObject = state.Value.ToObject<JObject>();
                 if (variableNode.DataType.NamespaceIndex != 0)
                 {
                     var analyzer = new DataTypeAnalyzer(_session);
@@ -2750,30 +2916,19 @@ namespace WebPlatform.OPCUALayer
                     string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
 
                     StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
-                    var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, state.Value.ToObject<JObject>(), _session.MessageContext, encodingNodeId);
+                    var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObject, _session.MessageContext, encodingNodeId);
 
                     return new DataValue(new Variant(value));
                 }
-                else
-                {
-                    Type mType = TypeInfo.GetSystemType(variableNode.DataType, _session.Factory);
-                    foreach (var field in mType.GetFields())
-                    {
-                        field.Name.ToString();
-                    }
-                    var a = state.Value.ToString();
-                    var value = JsonConvert.DeserializeObject(a, mType);
-                    return new DataValue(new Variant(value));
-                }
+
+                var systemType = TypeInfo.GetSystemType(variableNode.DataType, _session.Factory);
+                var jsonDecoder = new PlatformJSONDecoder(jObject.ToString(), _session.MessageContext);
+                var valueToWrite = Activator.CreateInstance(systemType) as IEncodeable;
+                if (valueToWrite != null) valueToWrite.Decode(jsonDecoder);
+                return new DataValue(new Variant(valueToWrite));
             }
-            else if (variableNode.ValueRank == 1)
-            {
-                throw new NotImplementedException();
-            }
-            else
-            {
-                throw new NotImplementedException();
-            }
+
+            else throw new NotImplementedException("Write of arrays of extensionobjects is not supported");
         }
 
         private NodeId ParsePlatformNodeIdString(string str)

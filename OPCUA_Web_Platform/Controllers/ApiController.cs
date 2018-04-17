@@ -155,8 +155,8 @@ namespace WebPlatform.Controllers
             return Ok(result);
         }
 
-        [HttpPut("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-(?:(\\d+)|(.+))$)?}")]
-        public async Task<IActionResult> PutNodeAsync(int ds_id, string node_id, [FromBody] VariableState state)
+        [HttpPost("data-sets/{ds_id:int}/nodes/{node_id:regex(^\\d+-(?:(\\d+)|(.+))$)?}")]
+        public async Task<IActionResult> PostNodeAsync(int ds_id, string node_id, [FromBody] VariableState state)
         {
             if (state == null || !state.isValid)
                 return BadRequest(new
