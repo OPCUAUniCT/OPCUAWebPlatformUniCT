@@ -2655,13 +2655,13 @@ namespace WebPlatform.OPCUALayer
             
             if (variableNode.ValueRank == -1)
             {
-                var decoder = new PlatformJSONDecoder(state.Value.ToString(), _session.MessageContext);
+                var decoder = new PlatformJsonDecoder(state.Value.ToString(), _session.MessageContext);
                 var valueToWrite = decoder.ReadDiagnosticInfo("Value");
                 return new DataValue(new Variant(valueToWrite));
             }
             else if (variableNode.ValueRank == 1)
             {
-                var decoder = new PlatformJSONDecoder(state.Value.ToString(), _session.MessageContext);
+                var decoder = new PlatformJsonDecoder(state.Value.ToString(), _session.MessageContext);
                 var valuesToWriteArray = decoder.ReadDiagnosticInfoArray("value");
                 return new DataValue(new Variant(valuesToWriteArray));
             }
@@ -2958,7 +2958,7 @@ namespace WebPlatform.OPCUALayer
                 }
 
                 var systemType = TypeInfo.GetSystemType(variableNode.DataType, _session.Factory);
-                var jsonDecoder = new PlatformJSONDecoder(jObject.ToString(), _session.MessageContext);
+                var jsonDecoder = new PlatformJsonDecoder(jObject.ToString(), _session.MessageContext);
                 var valueToWrite = Activator.CreateInstance(systemType) as IEncodeable;
                 if (valueToWrite != null) valueToWrite.Decode(jsonDecoder);
                 return new DataValue(new Variant(valueToWrite));

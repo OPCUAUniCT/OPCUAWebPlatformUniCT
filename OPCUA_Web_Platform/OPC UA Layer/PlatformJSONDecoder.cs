@@ -12,7 +12,7 @@ using TypeInfo = Opc.Ua.TypeInfo;
 
 namespace WebPlatform.OPC_UA_Layer
 {
-    public class PlatformJSONDecoder:  IDecoder
+    public class PlatformJsonDecoder:  JsonDecoder
     {
         #region Private Fields
         private JsonTextReader m_reader;
@@ -25,73 +25,29 @@ namespace WebPlatform.OPC_UA_Layer
         #endregion
 
         #region Constructors
-        public PlatformJSONDecoder(string json, ServiceMessageContext context)
+        
+        public PlatformJsonDecoder(string json, ServiceMessageContext context): base (json, context)
         {
-            if (context == null) throw new ArgumentNullException("context");
-            Initialize();
-
+            if (context == null)
+                throw new ArgumentNullException(nameof (context));
+            this.Initialize();
             m_context = context;
-            m_nestingLevel = 0;
-            m_reader = new JsonTextReader(new StringReader(json));
-            m_root = ReadObject();
+            m_nestingLevel = 0U;
+            m_reader = new JsonTextReader((TextReader) new StringReader(json));
+            m_root = this.ReadObject();
             m_stack = new Stack<object>();
-            m_stack.Push(m_root);
+            m_stack.Push((object) this.m_root);
         }
-
-        /// <summary>
-        /// Sets private members to default values.
-        /// </summary>
+        
         private void Initialize()
         {
-            m_reader = null;
+            m_reader = (JsonTextReader) null;
         }
-        #endregion
 
+        #endregion
+        
         #region Public Methods
         
-        /// <summary>
-        /// Initializes the tables used to map namespace and server uris during decoding.
-        /// </summary>
-        /// <param name="namespaceUris">The namespaces URIs referenced by the data being decoded.</param>
-        /// <param name="serverUris">The server URIs referenced by the data being decoded.</param>
-        public void SetMappingTables(NamespaceTable namespaceUris, StringTable serverUris)
-        {
-            m_namespaceMappings = null;
-
-            if (namespaceUris != null && m_context.NamespaceUris != null)
-            {
-                m_namespaceMappings = m_context.NamespaceUris.CreateMapping(namespaceUris, false);
-            }
-
-            m_serverMappings = null;
-
-            if (serverUris != null && m_context.ServerUris != null)
-            {
-                m_serverMappings = m_context.ServerUris.CreateMapping(serverUris, false);
-            }
-        }
-
-        /// <summary>
-        /// Closes the stream used for reading.
-        /// </summary>
-        public void Close()
-        {
-            m_reader.Close();
-        }
-
-        /// <summary>
-        /// Closes the stream used for reading.
-        /// </summary>
-        public void Close(bool checkEof)
-        {
-            if (checkEof && m_reader.TokenType != JsonToken.EndObject)
-            {
-                while (m_reader.Read() && m_reader.TokenType != JsonToken.EndObject) ;
-            }
-
-            m_reader.Close();
-        }
-
         private List<object> ReadArray()
         {
             List<object> elements = new List<object>();
@@ -185,70 +141,11 @@ namespace WebPlatform.OPC_UA_Layer
 
             return fields;
         }
-
-        /// <summary>
-        /// Reads the body extension object from the stream.
-        /// </summary>
-        public object ReadExtensionObjectBody(ExpandedNodeId typeId)
-        {
-            return null;
-        }
-        #endregion
-
-        #region IDisposable Members
-        /// <summary>
-        /// Frees any unmanaged resources.
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-
-        /// <summary>
-        /// An overrideable version of the Dispose.
-        /// </summary>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (m_reader != null)
-                {
-                    m_reader.Close();
-                }
-            }
-        }
+        
         #endregion
 
         #region IDecoder Members
-        /// <summary>
-        /// The type of encoding being used.
-        /// </summary>
-        public EncodingType EncodingType
-        {
-            get { return EncodingType.Json; }
-        }
-
-        /// <summary>
-        /// The message context associated with the decoder.
-        /// </summary>
-        public ServiceMessageContext Context
-        {
-            get { return m_context; }
-        }
-
-        /// <summary>
-        /// Pushes a namespace onto the namespace stack.
-        /// </summary>
-        public void PushNamespace(string namespaceUri)
-        {
-        }
-
-        /// <summary>
-        /// Pops a namespace from the namespace stack.
-        /// </summary>
-        public void PopNamespace()
-        {
-        }
+        
 
         public bool ReadField(string fieldName, out object token)
         {
@@ -273,7 +170,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a boolean from the stream.
         /// </summary>
-        public bool ReadBoolean(string fieldName)
+        public new bool ReadBoolean(string fieldName)
         {
             object token = null;
 
@@ -295,7 +192,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a sbyte from the stream.
         /// </summary>
-        public sbyte ReadSByte(string fieldName)
+        public new sbyte ReadSByte(string fieldName)
         {
             object token = null;
 
@@ -322,7 +219,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a byte from the stream.
         /// </summary>
-        public byte ReadByte(string fieldName)
+        public new byte ReadByte(string fieldName)
         {
             object token = null;
 
@@ -349,7 +246,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a short from the stream.
         /// </summary>
-        public short ReadInt16(string fieldName)
+        public new short ReadInt16(string fieldName)
         {
             object token = null;
 
@@ -376,7 +273,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a ushort from the stream.
         /// </summary>
-        public ushort ReadUInt16(string fieldName)
+        public new ushort ReadUInt16(string fieldName)
         {
             object token = null;
 
@@ -403,7 +300,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an int from the stream.
         /// </summary>
-        public int ReadInt32(string fieldName)
+        public new int ReadInt32(string fieldName)
         {
             object token = null;
 
@@ -431,7 +328,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a uint from the stream.
         /// </summary>
-        public uint ReadUInt32(string fieldName)
+        public new uint ReadUInt32(string fieldName)
         {
             object token = null;
 
@@ -458,7 +355,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a long from the stream.
         /// </summary>
-        public long ReadInt64(string fieldName)
+        public new long ReadInt64(string fieldName)
         {
             object token = null;
 
@@ -480,7 +377,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a ulong from the stream.
         /// </summary>
-        public ulong ReadUInt64(string fieldName)
+        public new ulong ReadUInt64(string fieldName)
         {
             object token = null;
 
@@ -507,7 +404,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a float from the stream.
         /// </summary>
-        public float ReadFloat(string fieldName)
+        public new float ReadFloat(string fieldName)
         {
             object token = null;
 
@@ -534,7 +431,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a double from the stream.
         /// </summary>
-        public double ReadDouble(string fieldName)
+        public new double ReadDouble(string fieldName)
         {
             object token = null;
 
@@ -556,7 +453,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a string from the stream.
         /// </summary>
-        public string ReadString(string fieldName)
+        public new string ReadString(string fieldName)
         {
             object token = null;
 
@@ -583,7 +480,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a UTC date/time from the stream.
         /// </summary>
-        public DateTime ReadDateTime(string fieldName)
+        public new DateTime ReadDateTime(string fieldName)
         {
             object token = null;
 
@@ -594,7 +491,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             var value = token as DateTime?;
 
-            if (value != null)
+            if (value == null)
             {
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " is not a date string as expected");
             }
@@ -605,7 +502,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a GUID from the stream.
         /// </summary>
-        public Uuid ReadGuid(string fieldName)
+        public new Uuid ReadGuid(string fieldName)
         {
             object token = null;
 
@@ -634,7 +531,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a byte string from the stream.
         /// </summary>
-        public byte[] ReadByteString(string fieldName)
+        public new byte[] ReadByteString(string fieldName)
         {
             object token = null;
 
@@ -660,41 +557,11 @@ namespace WebPlatform.OPC_UA_Layer
             return bytes;
         }
 
-        /// <summary>
-        /// Reads an XmlElement from the stream.
-        /// </summary>
-        public XmlElement ReadXmlElement(string fieldName)
-        {
-            object token = null;
-
-            if (!ReadField(fieldName, out token))
-            {
-                return null;
-            }
-
-            var value = token as string;
-
-            if (value == null)
-            {
-                return null;
-            }
-
-            var bytes = Convert.FromBase64String(value);
-
-            if (bytes != null && bytes.Length > 0)
-            {
-                XmlDocument document = new XmlDocument();
-                document.InnerXml = new UTF8Encoding().GetString(bytes);
-                return document.DocumentElement;
-            }
-
-            return null;
-        }
-
+        
         /// <summary>
         /// Reads an NodeId from the stream.
         /// </summary>
-        public NodeId ReadNodeId(string fieldName)
+        public new NodeId ReadNodeId(string fieldName)
         {
             object token = null;
 
@@ -716,7 +583,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an ExpandedNodeId from the stream.
         /// </summary>
-        public ExpandedNodeId ReadExpandedNodeId(string fieldName)
+        public new ExpandedNodeId ReadExpandedNodeId(string fieldName)
         {
             object token = null;
 
@@ -762,7 +629,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an StatusCode from the stream.
         /// </summary>
-        public StatusCode ReadStatusCode(string fieldName)
+        public new StatusCode ReadStatusCode(string fieldName)
         {
             object token = null;
 
@@ -813,7 +680,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an DiagnosticInfo from the stream.
         /// </summary>
-        public DiagnosticInfo ReadDiagnosticInfo(string fieldName)
+        public new DiagnosticInfo ReadDiagnosticInfo(string fieldName)
         {
             object token = (object) null;
             if (!ReadField(fieldName, out token))
@@ -853,7 +720,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an QualifiedName from the stream.
         /// </summary>
-        public QualifiedName ReadQualifiedName(string fieldName)
+        public new QualifiedName ReadQualifiedName(string fieldName)
         {
             object token = null;
 
@@ -896,7 +763,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an LocalizedText from the stream.
         /// </summary>
-        public LocalizedText ReadLocalizedText(string fieldName)
+        public new LocalizedText ReadLocalizedText(string fieldName)
         {
             object token = null;
 
@@ -936,344 +803,6 @@ namespace WebPlatform.OPC_UA_Layer
             return new LocalizedText(locale, text);
         }
 
-        private Variant ReadVariantBody(string fieldName, BuiltInType type)
-        {
-            switch (type)
-            {
-                case BuiltInType.Boolean: { return new Variant(ReadBoolean(fieldName), TypeInfo.Scalars.Boolean); }
-                case BuiltInType.SByte: { return new Variant(ReadSByte(fieldName), TypeInfo.Scalars.SByte); }
-                case BuiltInType.Byte: { return new Variant(ReadByte(fieldName), TypeInfo.Scalars.Byte); }
-                case BuiltInType.Int16: { return new Variant(ReadInt16(fieldName), TypeInfo.Scalars.Int16); }
-                case BuiltInType.UInt16: { return new Variant(ReadUInt16(fieldName), TypeInfo.Scalars.UInt16); }
-                case BuiltInType.Int32: { return new Variant(ReadInt32(fieldName), TypeInfo.Scalars.Int32); }
-                case BuiltInType.UInt32: { return new Variant(ReadUInt32(fieldName), TypeInfo.Scalars.UInt32); }
-                case BuiltInType.Int64: { return new Variant(ReadInt64(fieldName), TypeInfo.Scalars.Int64); }
-                case BuiltInType.UInt64: { return new Variant(ReadUInt64(fieldName), TypeInfo.Scalars.UInt64); }
-                case BuiltInType.Float: { return new Variant(ReadFloat(fieldName), TypeInfo.Scalars.Float); }
-                case BuiltInType.Double: { return new Variant(ReadDouble(fieldName), TypeInfo.Scalars.Double); }
-                case BuiltInType.String: { return new Variant(ReadString(fieldName), TypeInfo.Scalars.String); }
-                case BuiltInType.ByteString: { return new Variant(ReadByteString(fieldName), TypeInfo.Scalars.ByteString); }
-                case BuiltInType.DateTime: { return new Variant(ReadDateTime(fieldName), TypeInfo.Scalars.DateTime); }
-                case BuiltInType.Guid: { return new Variant(ReadGuid(fieldName), TypeInfo.Scalars.Guid); }
-                case BuiltInType.NodeId: { return new Variant(ReadNodeId(fieldName), TypeInfo.Scalars.NodeId); }
-                case BuiltInType.ExpandedNodeId: { return new Variant(ReadExpandedNodeId(fieldName), TypeInfo.Scalars.ExpandedNodeId); }
-                case BuiltInType.QualifiedName: { return new Variant(ReadQualifiedName(fieldName), TypeInfo.Scalars.QualifiedName); }
-                case BuiltInType.LocalizedText: { return new Variant(ReadLocalizedText(fieldName), TypeInfo.Scalars.LocalizedText); }
-                case BuiltInType.StatusCode: { return new Variant(ReadStatusCode(fieldName), TypeInfo.Scalars.StatusCode); }
-                case BuiltInType.XmlElement: { return new Variant(ReadXmlElement(fieldName), TypeInfo.Scalars.XmlElement); }
-                case BuiltInType.ExtensionObject: { return new Variant(ReadExtensionObject(fieldName), TypeInfo.Scalars.ExtensionObject); }
-                case BuiltInType.Variant: { return new Variant(ReadVariant(fieldName), TypeInfo.Scalars.Variant); }
-            }
-
-            return Variant.Null;
-        }
-
-        private Variant ReadVariantArrayBody(string fieldName, BuiltInType type)
-        {
-            switch (type)
-            {
-                case BuiltInType.Boolean: { return new Variant(ReadBooleanArray(fieldName), TypeInfo.Arrays.Boolean); }
-                case BuiltInType.SByte: { return new Variant(ReadSByteArray(fieldName), TypeInfo.Arrays.SByte); }
-                case BuiltInType.Byte: { return new Variant(ReadByteArray(fieldName), TypeInfo.Arrays.Byte); }
-                case BuiltInType.Int16: { return new Variant(ReadInt16Array(fieldName), TypeInfo.Arrays.Int16); }
-                case BuiltInType.UInt16: { return new Variant(ReadUInt16Array(fieldName), TypeInfo.Arrays.UInt16); }
-                case BuiltInType.Int32: { return new Variant(ReadInt32Array(fieldName), TypeInfo.Arrays.Int32); }
-                case BuiltInType.UInt32: { return new Variant(ReadUInt32Array(fieldName), TypeInfo.Arrays.UInt32); }
-                case BuiltInType.Int64: { return new Variant(ReadInt64Array(fieldName), TypeInfo.Arrays.Int64); }
-                case BuiltInType.UInt64: { return new Variant(ReadUInt64Array(fieldName), TypeInfo.Arrays.UInt64); }
-                case BuiltInType.Float: { return new Variant(ReadFloatArray(fieldName), TypeInfo.Arrays.Float); }
-                case BuiltInType.Double: { return new Variant(ReadDoubleArray(fieldName), TypeInfo.Arrays.Double); }
-                case BuiltInType.String: { return new Variant(ReadStringArray(fieldName), TypeInfo.Arrays.String); }
-                case BuiltInType.ByteString: { return new Variant(ReadByteStringArray(fieldName), TypeInfo.Arrays.ByteString); }
-                case BuiltInType.DateTime: { return new Variant(ReadDateTimeArray(fieldName), TypeInfo.Arrays.DateTime); }
-                case BuiltInType.Guid: { return new Variant(ReadGuidArray(fieldName), TypeInfo.Arrays.Guid); }
-                case BuiltInType.NodeId: { return new Variant(ReadNodeIdArray(fieldName), TypeInfo.Arrays.NodeId); }
-                case BuiltInType.ExpandedNodeId: { return new Variant(ReadExpandedNodeIdArray(fieldName), TypeInfo.Arrays.ExpandedNodeId); }
-                case BuiltInType.QualifiedName: { return new Variant(ReadQualifiedNameArray(fieldName), TypeInfo.Arrays.QualifiedName); }
-                case BuiltInType.LocalizedText: { return new Variant(ReadLocalizedTextArray(fieldName), TypeInfo.Arrays.LocalizedText); }
-                case BuiltInType.StatusCode: { return new Variant(ReadStatusCodeArray(fieldName), TypeInfo.Arrays.StatusCode); }
-                case BuiltInType.XmlElement: { return new Variant(ReadXmlElementArray(fieldName), TypeInfo.Arrays.XmlElement); }
-                case BuiltInType.ExtensionObject: { return new Variant(ReadExtensionObjectArray(fieldName), TypeInfo.Arrays.ExtensionObject); }
-                case BuiltInType.Variant: { return new Variant(ReadVariantArray(fieldName), TypeInfo.Arrays.Variant); }
-            }
-
-            return Variant.Null;
-        }
-
-        /// <summary>
-        /// Reads an Variant from the stream.
-        /// </summary>
-        public Variant ReadVariant(string fieldName)
-        {
-            object token = null;
-
-            if (!ReadField(fieldName, out token))
-            {
-                return Variant.Null;
-            }
-
-            var value = token as Dictionary<string, object>;
-
-            if (value == null)
-            {
-                return Variant.Null;
-            }
-
-            // check the nesting level for avoiding a stack overflow.
-            if (m_nestingLevel > m_context.MaxEncodingNestingLevels) 
-            {
-                throw ServiceResultException.Create(
-                    StatusCodes.BadEncodingLimitsExceeded,
-                    "Maximum nesting level of {0} was exceeded",
-                    m_context.MaxEncodingNestingLevels);
-            }
-            try {
-                m_nestingLevel++;
-                m_stack.Push(value);
-
-                BuiltInType type = (BuiltInType)ReadByte("Type");
-
-                var context = m_stack.Peek() as Dictionary<string, object>;
-
-                if (!context.TryGetValue("Body", out token))
-                {
-                    return Variant.Null;
-                }
-
-                if (token is Array)
-                {
-                    var array = ReadVariantBody("Body", type);
-                    var dimensions = ReadInt32Array("Dimensions");
-
-                    if (array.Value is Array && dimensions != null && dimensions.Count > 1)
-                    {
-                        array = new Variant(new Matrix((Array)array.Value, type, dimensions.ToArray()));
-                    }
-
-                    return array;
-                }
-                else
-                {
-                    return ReadVariantBody("Body", type);
-                }
-            }
-            finally
-            {
-                m_nestingLevel--;
-                m_stack.Pop();
-            }
-        }
-
-        /// <summary>
-        /// Reads an DataValue from the stream.
-        /// </summary>
-        public DataValue ReadDataValue(string fieldName)
-        {
-            object token = null;
-
-            if (!ReadField(fieldName, out token))
-            {
-                return null;
-            }
-
-            var value = token as Dictionary<string, object>;
-
-            if (value == null)
-            {
-                return null;
-            }
-
-            DataValue dv = new DataValue();
-
-            try
-            {
-                m_stack.Push(value);
-
-                dv.WrappedValue = ReadVariant("Value");
-                dv.StatusCode = ReadStatusCode("StatusCode");
-                dv.SourceTimestamp = ReadDateTime("SourceTimestamp");
-                dv.SourcePicoseconds = ReadUInt16("SourcePicoseconds");
-                dv.ServerTimestamp = ReadDateTime("ServerTimestamp");
-                dv.ServerPicoseconds = ReadUInt16("ServerPicoseconds");
-            }
-            finally
-            {
-                m_stack.Pop();
-            }
-
-            return dv;
-        }
-
-        private void EncodeAsJson(JsonTextWriter writer, object value)
-        {
-            var map = value as Dictionary<string, object>;
-
-            if (map != null)
-            {
-                EncodeAsJson(writer, map);
-                return;
-            }
-
-            var list = value as List<object>;
-
-            if (list != null)
-            {
-                writer.WriteStartArray();
-
-                foreach (var element in list)
-                {
-                    EncodeAsJson(writer, element);
-                }
-
-                writer.WriteStartArray();
-                return;
-            }
-
-            writer.WriteValue(value);
-        }
-
-        private void EncodeAsJson(JsonTextWriter writer, Dictionary<string, object> value)
-        {
-            writer.WriteStartObject();
-
-            foreach (var field in value)
-            {
-                writer.WritePropertyName(field.Key);
-                EncodeAsJson(writer, field.Value);
-            }
-
-            writer.WriteEndObject();
-        }
-
-        /// <summary>
-        /// Reads an extension object from the stream.
-        /// </summary>
-        public ExtensionObject ReadExtensionObject(string fieldName)
-        {
-            object token = null;
-
-            if (!ReadField(fieldName, out token))
-            {
-                return null;
-            }
-
-            var value = token as Dictionary<string, object>;
-
-            if (value == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                m_stack.Push(value);
-
-                NodeId typeId = ReadNodeId("TypeId");
-
-                ExpandedNodeId absoluteId = NodeId.ToExpandedNodeId(typeId, m_context.NamespaceUris);
-
-                if (!NodeId.IsNull(typeId) && NodeId.IsNull(absoluteId))
-                {
-                    Utils.Trace("Cannot de-serialized extension objects if the NamespaceUri is not in the NamespaceTable: Type = {0}", typeId);
-                }
-
-                byte encoding = ReadByte("Encoding");
-
-                if (encoding == 1)
-                {
-                    var bytes = ReadByteString("Body");
-                    return new ExtensionObject(typeId, bytes);
-                }
-
-                if (encoding == 2)
-                {
-                    var xml = ReadXmlElement("Body");
-                    return new ExtensionObject(typeId, xml);
-                }
-
-                Type systemType = m_context.Factory.GetSystemType(typeId);
-
-                if (systemType != null)
-                {
-                    var encodeable = ReadEncodeable("Body", systemType);
-                    return new ExtensionObject(typeId, encodeable);
-                }
-
-                var ostrm = new MemoryStream();
-
-                using (JsonTextWriter writer = new JsonTextWriter(new StreamWriter(ostrm)))
-                {
-                    EncodeAsJson(writer, token);
-                }
-
-                return new ExtensionObject(typeId, ostrm.ToArray());
-            }
-            finally
-            {
-                m_stack.Pop();
-            }
-        }
-
-        /// <summary>
-        /// Reads an encodeable object from the stream.
-        /// </summary>
-        public IEncodeable ReadEncodeable(
-            string fieldName,
-            System.Type systemType)
-        {
-            if (systemType == null) throw new ArgumentNullException("systemType");
-
-            object token = null;
-
-            if (!ReadField(fieldName, out token))
-            {
-                return null;
-            }
-
-            IEncodeable value = Activator.CreateInstance(systemType) as IEncodeable;
-
-            if (value == null)
-            {
-                throw new ServiceResultException(StatusCodes.BadDecodingError, Utils.Format("Type does not support IEncodeable interface: '{0}'", systemType.FullName));
-            }
-
-            // check the nesting level for avoiding a stack overflow.
-            if (m_nestingLevel > m_context.MaxEncodingNestingLevels)
-            {
-                throw ServiceResultException.Create(
-                    StatusCodes.BadEncodingLimitsExceeded,
-                    "Maximum nesting level of {0} was exceeded",
-                    m_context.MaxEncodingNestingLevels);
-            }
-
-            m_nestingLevel++;
-
-            try
-            {
-                m_stack.Push(token);
-
-                value.Decode(this);
-            }
-            finally
-            {
-                m_stack.Pop();
-            }
-
-            m_nestingLevel--;
-
-            return value;
-        }
-
-        /// <summary>
-        ///  Reads an enumerated value from the stream.
-        /// </summary>
-        public Enum ReadEnumerated(string fieldName, System.Type enumType)
-        {
-            if (enumType == null) throw new ArgumentNullException("enumType");
-
-            return (Enum)Enum.ToObject(enumType, ReadInt32(fieldName));
-        }
-
         private bool ReadArrayField(string fieldName, out List<object> array)
         {
             object token = array = null;
@@ -1301,7 +830,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a boolean array from the stream.
         /// </summary>
-        public BooleanCollection ReadBooleanArray(string fieldName)
+        public new BooleanCollection ReadBooleanArray(string fieldName)
         {
             var values = new BooleanCollection();
 
@@ -1309,7 +838,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1331,7 +860,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a sbyte array from the stream.
         /// </summary>
-        public SByteCollection ReadSByteArray(string fieldName)
+        public new SByteCollection ReadSByteArray(string fieldName)
         {
             var values = new SByteCollection();
 
@@ -1339,7 +868,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1361,7 +890,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a byte array from the stream.
         /// </summary>
-        public ByteCollection ReadByteArray(string fieldName)
+        public new ByteCollection ReadByteArray(string fieldName)
         {
             var values = new ByteCollection();
 
@@ -1369,7 +898,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1391,7 +920,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a short array from the stream.
         /// </summary>
-        public Int16Collection ReadInt16Array(string fieldName)
+        public new Int16Collection ReadInt16Array(string fieldName)
         {
             var values = new Int16Collection();
 
@@ -1399,7 +928,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1421,7 +950,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a ushort array from the stream.
         /// </summary>
-        public UInt16Collection ReadUInt16Array(string fieldName)
+        public new UInt16Collection ReadUInt16Array(string fieldName)
         {
             var values = new UInt16Collection();
 
@@ -1429,7 +958,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1451,7 +980,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a int array from the stream.
         /// </summary>
-        public Int32Collection ReadInt32Array(string fieldName)
+        public new Int32Collection ReadInt32Array(string fieldName)
         {
             var values = new Int32Collection();
 
@@ -1459,7 +988,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1481,7 +1010,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a uint array from the stream.
         /// </summary>
-        public UInt32Collection ReadUInt32Array(string fieldName)
+        public new UInt32Collection ReadUInt32Array(string fieldName)
         {
             var values = new UInt32Collection();
 
@@ -1489,7 +1018,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1511,7 +1040,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a long array from the stream.
         /// </summary>
-        public Int64Collection ReadInt64Array(string fieldName)
+        public new Int64Collection ReadInt64Array(string fieldName)
         {
             var values = new Int64Collection();
 
@@ -1519,7 +1048,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1549,7 +1078,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1571,7 +1100,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a float array from the stream.
         /// </summary>
-        public FloatCollection ReadFloatArray(string fieldName)
+        public new FloatCollection ReadFloatArray(string fieldName)
         {
             var values = new FloatCollection();
 
@@ -1579,7 +1108,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1601,7 +1130,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a double array from the stream.
         /// </summary>
-        public DoubleCollection ReadDoubleArray(string fieldName)
+        public new DoubleCollection ReadDoubleArray(string fieldName)
         {
             var values = new DoubleCollection();
 
@@ -1609,7 +1138,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1631,7 +1160,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a string array from the stream.
         /// </summary>
-        public StringCollection ReadStringArray(string fieldName)
+        public new StringCollection ReadStringArray(string fieldName)
         {
             var values = new StringCollection();
 
@@ -1639,7 +1168,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1661,7 +1190,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a UTC date/time array from the stream.
         /// </summary>
-        public DateTimeCollection ReadDateTimeArray(string fieldName)
+        public new DateTimeCollection ReadDateTimeArray(string fieldName)
         {
             var values = new DateTimeCollection();
 
@@ -1669,7 +1198,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1691,7 +1220,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a GUID array from the stream.
         /// </summary>
-        public UuidCollection ReadGuidArray(string fieldName)
+        public new UuidCollection ReadGuidArray(string fieldName)
         {
             var values = new UuidCollection();
 
@@ -1699,7 +1228,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1722,7 +1251,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a byte string array from the stream.
         /// </summary>
-        public ByteStringCollection ReadByteStringArray(string fieldName)
+        public new ByteStringCollection ReadByteStringArray(string fieldName)
         {
             var values = new ByteStringCollection();
 
@@ -1730,7 +1259,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1753,7 +1282,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an XmlElement array from the stream.
         /// </summary>
-        public XmlElementCollection ReadXmlElementArray(string fieldName)
+        public new XmlElementCollection ReadXmlElementArray(string fieldName)
         {
             var values = new XmlElementCollection();
 
@@ -1761,7 +1290,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1784,7 +1313,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an NodeId array from the stream.
         /// </summary>
-        public NodeIdCollection ReadNodeIdArray(string fieldName)
+        public new NodeIdCollection ReadNodeIdArray(string fieldName)
         {
             var values = new NodeIdCollection();
 
@@ -1792,7 +1321,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1815,7 +1344,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an ExpandedNodeId array from the stream.
         /// </summary>
-        public ExpandedNodeIdCollection ReadExpandedNodeIdArray(string fieldName)
+        public new ExpandedNodeIdCollection ReadExpandedNodeIdArray(string fieldName)
         {
             var values = new ExpandedNodeIdCollection();
 
@@ -1823,7 +1352,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1846,7 +1375,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an StatusCode array from the stream.
         /// </summary>
-        public StatusCodeCollection ReadStatusCodeArray(string fieldName)
+        public new StatusCodeCollection ReadStatusCodeArray(string fieldName)
         {
             var values = new StatusCodeCollection();
 
@@ -1854,7 +1383,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1877,7 +1406,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an DiagnosticInfo array from the stream.
         /// </summary>
-        public DiagnosticInfoCollection ReadDiagnosticInfoArray(string fieldName)
+        public new DiagnosticInfoCollection ReadDiagnosticInfoArray(string fieldName)
         {
             var values = new DiagnosticInfoCollection();
 
@@ -1885,7 +1414,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1908,7 +1437,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an QualifiedName array from the stream.
         /// </summary>
-        public QualifiedNameCollection ReadQualifiedNameArray(string fieldName)
+        public new QualifiedNameCollection ReadQualifiedNameArray(string fieldName)
         {
             var values = new QualifiedNameCollection();
 
@@ -1916,7 +1445,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1939,7 +1468,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads an LocalizedText array from the stream.
         /// </summary>
-        public LocalizedTextCollection ReadLocalizedTextArray(string fieldName)
+        public new LocalizedTextCollection ReadLocalizedTextArray(string fieldName)
         {
             var values = new LocalizedTextCollection();
 
@@ -1947,7 +1476,7 @@ namespace WebPlatform.OPC_UA_Layer
 
             if (!ReadArrayField(fieldName, out token))
             {
-                return values;
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
             for (int ii = 0; ii < token.Count; ii++)
@@ -1967,164 +1496,7 @@ namespace WebPlatform.OPC_UA_Layer
             return values;
         }
 
-        /// <summary>
-        /// Reads an Variant array from the stream.
-        /// </summary>
-        public VariantCollection ReadVariantArray(string fieldName)
-        {
-            var values = new VariantCollection();
-
-            List<object> token = null;
-
-            if (!ReadArrayField(fieldName, out token))
-            {
-                return values;
-            }
-
-            for (int ii = 0; ii < token.Count; ii++)
-            {
-                try
-                {
-                    m_stack.Push(token[ii]);
-                    var element = ReadVariant(null);
-                    values.Add(element);
-                }
-                finally
-                {
-                    m_stack.Pop();
-                }
-            }
-
-            return values;
-        }
-
-        /// <summary>
-        /// Reads an DataValue array from the stream.
-        /// </summary>
-        public DataValueCollection ReadDataValueArray(string fieldName)
-        {
-            var values = new DataValueCollection();
-
-            List<object> token = null;
-
-            if (!ReadArrayField(fieldName, out token))
-            {
-                return values;
-            }
-
-            for (int ii = 0; ii < token.Count; ii++)
-            {
-                try
-                {
-                    m_stack.Push(token[ii]);
-                    var element = ReadDataValue(null);
-                    values.Add(element);
-                }
-                finally
-                {
-                    m_stack.Pop();
-                }
-            }
-
-            return values;
-        }
-
-        /// <summary>
-        /// Reads an array of extension objects from the stream.
-        /// </summary>
-        public ExtensionObjectCollection ReadExtensionObjectArray(string fieldName)
-        {
-            var values = new ExtensionObjectCollection();
-
-            List<object> token = null;
-
-            if (!ReadArrayField(fieldName, out token))
-            {
-                return values;
-            }
-
-            for (int ii = 0; ii < token.Count; ii++)
-            {
-                try
-                {
-                    m_stack.Push(token[ii]);
-                    var element = ReadExtensionObject(null);
-                    values.Add(element);
-                }
-                finally
-                {
-                    m_stack.Pop();
-                }
-            }
-
-            return values;
-        }
-
-        /// <summary>
-        /// Reads an encodeable object array from the stream.
-        /// </summary>
-        public Array ReadEncodeableArray(string fieldName, System.Type systemType)
-        {
-            if (systemType == null) throw new ArgumentNullException("systemType");
-
-            List<object> token = null;
-
-            if (!ReadArrayField(fieldName, out token))
-            {
-                return Array.CreateInstance(systemType, 0);
-            }
-
-            var values = Array.CreateInstance(systemType, token.Count);
-
-            for (int ii = 0; ii < token.Count; ii++)
-            {
-                try
-                {
-                    m_stack.Push(token[ii]);
-                    var element = ReadEncodeable(null, systemType);
-                    values.SetValue(element, ii);
-                }
-                finally
-                {
-                    m_stack.Pop();
-                }
-            }
-
-            return values;
-        }
-
-        /// <summary>
-        /// Reads an enumerated value array from the stream.
-        /// </summary>
-        public Array ReadEnumeratedArray(string fieldName, System.Type enumType)
-        {
-            if (enumType == null) throw new ArgumentNullException("enumType");
-
-            List<object> token = null;
-
-            if (!ReadArrayField(fieldName, out token))
-            {
-                return Array.CreateInstance(enumType, 0);
-            }
-
-            var values = Array.CreateInstance(enumType, token.Count);
-
-            for (int ii = 0; ii < token.Count; ii++)
-            {
-                try
-                {
-                    m_stack.Push(token[ii]);
-                    var element = ReadEnumerated(null, enumType);
-                    values.SetValue(element, ii);
-                }
-                finally
-                {
-                    m_stack.Pop();
-                }
-            }
-
-            return values;
-        }
+        
         #endregion
 
         #region Private Methods
