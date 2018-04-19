@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
@@ -12,7 +11,6 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 using Newtonsoft.Json.Schema.Generation;
 using NJsonSchema;
-using NJsonSchema.Infrastructure;
 using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Exceptions;
@@ -20,6 +18,7 @@ using WebPlatform.Extensions;
 using WebPlatform.Models.DataSet;
 using WebPlatform.Models.OPCUA;
 using WebPlatform.OPC_UA_Layer;
+using TypeInfo = Opc.Ua.TypeInfo;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -1167,6 +1166,22 @@ namespace WebPlatform.OPCUALayer
 
             BuiltInType type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
 
+            if(state.Value.Type == JTokenType.Array && variableNode.ValueRank == ValueRanks.Scalar)
+                throw new ValueToWriteTypeException("Error: sent an array but expected a scalar value");
+            if(state.Value.Type != JTokenType.Array && 
+               (variableNode.ValueRank == ValueRanks.OneDimension || variableNode.ValueRank == ValueRanks.OneOrMoreDimensions || variableNode.ValueRank > 1))
+                throw new ValueToWriteTypeException("Error: sent a scalar value but expected an array");
+
+            if (type == BuiltInType.ExtensionObject)
+                return GetDataValueForStructured(variableNode, state);
+            
+            if (type == BuiltInType.Enumeration)
+                return GetDataValueForEnumeration(variableNode, state);
+
+            return GetDataValueForBuiltIn(type, state.Value, variableNode.ValueRank);
+
+
+            /*
             switch (type)
             {
                 case BuiltInType.Boolean:
@@ -1217,62 +1232,209 @@ namespace WebPlatform.OPCUALayer
                     return GetDataValueFromEnumeration(variableNode, state);
                 case BuiltInType.ExtensionObject:
                     return GetDataValueFromExtensionObject(variableNode, state);
+                    
             }
 
             return null;
+            */
         }
+
         
-        private DataValue GetDataValueFromBoolean(VariableNode variableNode, VariableState state)
+        private DataValue GetDataValueForBuiltIn(BuiltInType builtInType, JToken userValue, int uaRank)
+        {
+
+            var value = userValue;
+            var methodToCall = "Read" + builtInType;
+            
+            if (userValue.Type == JTokenType.Array)
+            {
+                value = userValue.ToMonoDimensionalJsonArray();
+                methodToCall += "Array";
+            }
+            var jObject = new JObject {{"Value", value}};
+            var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(jObject), _session.MessageContext);
+            var mInfo = typeof(PlatformJsonDecoder).GetMethod(methodToCall, new[] { typeof(string) });
+            
+            try
+            {
+                var builtInValue = mInfo.Invoke(platformJsonDecoder, new object[] {"Value"});
+
+                if (userValue.Type != JTokenType.Array) return new DataValue(new Variant(builtInValue));
+                
+                
+                
+                
+                //In case of Array dimensions array must be modified if user has sent a monodimensional array and want to write in a multidimensional array
+                var dimensions = userValue.GetJsonArrayDimensions();
+                if (dimensions.Length == 1 && uaRank > 1)
+                {
+                    var nofelemen = dimensions[0];
+                    dimensions = Array.ConvertAll(new int[uaRank], elem => 1);
+                    dimensions[0] = nofelemen;
+                }
+                var valueToWriteArray = builtInValue.GetType().GetMethod("ToArray").Invoke(builtInValue, new object[]{}) as Array;
+                return dimensions.Length > 1 ? new DataValue(new Variant(new Matrix(valueToWriteArray, builtInType, dimensions))) : new DataValue(new Variant(valueToWriteArray));
+                         }
+            catch (TargetInvocationException exception)
+            {
+                throw exception.InnerException;
+            }
+
+
+
+        }
+
+        private DataValue GetDataValueForStructured(VariableNode variableNode, VariableState state)
         {
             if (variableNode.ValueRank == -1)
             {
-                //Check if the JSON sent by user is a Boolean
-                if(state.Value.Type !=JTokenType.Boolean)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Boolean Value but received a JSON " + state.Value.Type);
-                return new DataValue(new Variant(state.Value.ToObject<Boolean>()));
+                //Check if the JSON sent by user is a Object
+                if (state.Value.Type != JTokenType.Object)
+                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object but received a JSON " + state.Value.Type);
+
+                var jObject = state.Value.ToObject<JObject>();
+                if (variableNode.DataType.NamespaceIndex != 0)
+                {
+                    var analyzer = new DataTypeAnalyzer(_session);
+                    var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(variableNode.DataType);
+                    var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                    string dictionary = analyzer.GetDictionary(descriptionNodeId);
+                    string descriptionId = ReadService(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+
+                    StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
+                    var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObject, _session.MessageContext, encodingNodeId);
+
+                    return new DataValue(new Variant(value));
+                }
+
+                var systemType = TypeInfo.GetSystemType(variableNode.DataType, _session.Factory);
+                var jsonDecoder = new PlatformJsonDecoder(jObject.ToString(), _session.MessageContext);
+                var valueToWrite = Activator.CreateInstance(systemType) as IEncodeable;
+                if (valueToWrite != null) valueToWrite.Decode(jsonDecoder);
+                return new DataValue(new Variant(valueToWrite));
+            }
+
+            else throw new NotImplementedException("Write of arrays of extensionobjects is not supported");
+        }
+        
+        private DataValue GetDataValueForEnumeration(VariableNode variableNode, VariableState state)
+        {
+            if (variableNode.ValueRank == -1)
+            {
+                //Check if the JSON sent by user is an Object
+                if (state.Value.Type != JTokenType.Object)
+                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object Value but received a JSON " + state.Value.Type);
+                JObject jObject = state.Value.ToObject<JObject>();
+                if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
+                    throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
+                JToken jtIndex = jObject["EnumIndex"];
+                JToken jtValue = jObject["EnumValue"];
+                if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
+                    throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
+                int valueToWrite = jtIndex.ToObject<Int32>();
+                int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
+
+                if(enstrreturn == 1)
+                {
+                    if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
+                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                }
+                else if(enstrreturn == 2)
+                {
+                    var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
+                    if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
+                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                }
+
+                return new DataValue(new Variant(valueToWrite));
             }
             else if (variableNode.ValueRank == 1)
             {
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
-                    throw new ValueToWriteTypeException("Array dimensions error: expected 1d JSON Array but received " + dimensions.Length + "d");
+                    throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                //Check that all values are Boolean
-                if(flatValuesToWrite.GetArrayType() != JTokenType.Boolean)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Boolean Array as expected");
-                Boolean[] valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Boolean>()));
+                //Check that all values are Object
+                if (flatValuesToWrite.GetArrayType() != JTokenType.Object)
+                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Object Array as expected");
+                Int32[] valuesToWriteArray = new Int32[flatValuesToWrite.Length];
+                JObject jObject;
+                for (int i = 0; i < flatValuesToWrite.Length; i++)
+                {
+                    jObject = flatValuesToWrite[i].ToObject<JObject>();
+                    if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
+                        throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
+                    JToken jtIndex = jObject["EnumIndex"];
+                    JToken jtValue = jObject["EnumValue"];
+                    if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
+                        throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
+                    int valueToWrite = jtIndex.ToObject<Int32>();
+                    int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
+
+                    if (enstrreturn == 1)
+                    {
+                        if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
+                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                    }
+                    else if (enstrreturn == 2)
+                    {
+                        var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
+                        if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
+                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
+                    }
+                    valuesToWriteArray[i] = valueToWrite;
+                }
+
                 return new DataValue(new Variant(valuesToWriteArray));
             }
             else
             {
-                //Check if the JSON sent by user is an array
-                if (state.Value.Type != JTokenType.Array)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
-                JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                Boolean[] valuesToWriteArray;
-                //Check if it is a monodimensional array
-                if (dimensions.Length == 1)
+                throw new NotImplementedException("Write Matrix of Enumeration not supported");
+            }
+        }
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        private DataValue GetDataValueFromBoolean(VariableNode variableNode, VariableState state)
+        {
+            switch (variableNode.ValueRank)
+            {
+                case ValueRanks.OneDimension:
                 {
-                    if (flatValuesToWrite.GetArrayType() != JTokenType.Boolean)
-                        throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Boolean Array as expected");
-                    valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Boolean>()));
-                    return new DataValue(new Variant(valuesToWriteArray));
+                    return GetDataValueForBuiltInArrayOrMatrix(BuiltInType.Boolean, state.Value,
+                        variableNode.ValueRank);
                 }
-                //Flat a multidimensional JToken Array
-                for (int i = 0; i < dimensions.Length - 1; i++)
-                    flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
-                //Check that all values are Boolean
-                if (flatValuesToWrite.GetArrayType() != JTokenType.Boolean)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Boolean Array as expected");
-                valuesToWriteArray = Array.ConvertAll(flatValuesToWrite, (item => item.ToObject<Boolean>()));
-                matrixToWrite = new Matrix(valuesToWriteArray, BuiltInType.Boolean, dimensions);
-                return new DataValue(new Variant(matrixToWrite));
+                case ValueRanks.OneOrMoreDimensions:
+                    if (state.Value.GetJsonArrayDimensions().Length == 1) goto case 1;
+                    else goto default;
+                case ValueRanks.Scalar:
+                {
+                    return GetDataValueForBuiltInScalar(BuiltInType.Boolean, state.Value);
+                }
+                case ValueRanks.Any:
+                    if (state.Value.Type == JTokenType.Array) goto case 0;
+                    else goto case -1;
+                case ValueRanks.ScalarOrOneDimension:
+                    if (state.Value.Type == JTokenType.Array) goto case 1;
+                    else goto case -1;
+                //Default -> Matrix with dimensions = VariableNode.Rank if VariableNode.Rank < 1 or any number of dimensions if VariableNode.Rank <=0
+                default:
+                {
+                    return GetDataValueForBuiltInArrayOrMatrix(BuiltInType.Boolean, state.Value,
+                        variableNode.ValueRank);
+                }
             }
         }
 
@@ -1299,7 +1461,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1324,7 +1486,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Byte[] valuesToWriteArray;
@@ -1384,7 +1546,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1409,7 +1571,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 SByte[] valuesToWriteArray;
@@ -1469,7 +1631,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1494,7 +1656,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Int16[] valuesToWriteArray;
@@ -1554,7 +1716,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1579,7 +1741,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 UInt16[] valuesToWriteArray;
@@ -1639,7 +1801,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1664,7 +1826,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Int32[] valuesToWriteArray;
@@ -1737,7 +1899,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1804,7 +1966,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1829,7 +1991,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 UInt32[] valuesToWriteArray;
@@ -1889,7 +2051,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1914,7 +2076,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Int64[] valuesToWriteArray;
@@ -1974,7 +2136,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -1999,7 +2161,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 UInt64[] valuesToWriteArray;
@@ -2059,7 +2221,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2084,7 +2246,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Single[] valuesToWriteArray;
@@ -2144,7 +2306,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2169,7 +2331,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 Double[] valuesToWriteArray;
@@ -2220,7 +2382,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2237,7 +2399,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 if (dimensions.Length == 1)
@@ -2258,7 +2420,6 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
-
         private DataValue GetDataValueFromByteString(VariableNode variableNode, VariableState state)
         {
             if (variableNode.ValueRank == -1)
@@ -2273,7 +2434,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2290,8 +2451,6 @@ namespace WebPlatform.OPCUALayer
                 throw new NotImplementedException();
             }
         }
-
-
 
         private DataValue GetDataValueFromGuid(VariableNode variableNode, VariableState state)
         {
@@ -2316,7 +2475,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2341,7 +2500,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 Guid[] valuesToWriteArray;
                 //Check if it is a monodimensional array
@@ -2402,7 +2561,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2427,7 +2586,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 DateTime[] valuesToWriteArray;
                 //Check if it is a monodimensional array
@@ -2488,7 +2647,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2513,7 +2672,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 StatusCode[] valuesToWriteArray;
@@ -2572,7 +2731,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2602,7 +2761,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 JObject jObject;
@@ -2651,23 +2810,50 @@ namespace WebPlatform.OPCUALayer
         
         private DataValue GetDataValueFromDiagnosticInfo(VariableNode variableNode, VariableState state)
         {
-            
-            
-            if (variableNode.ValueRank == -1)
+            switch (variableNode.ValueRank)
             {
-                var decoder = new PlatformJsonDecoder(state.Value.ToString(), _session.MessageContext);
-                var valueToWrite = decoder.ReadDiagnosticInfo("Value");
-                return new DataValue(new Variant(valueToWrite));
-            }
-            else if (variableNode.ValueRank == 1)
-            {
-                var decoder = new PlatformJsonDecoder(state.Value.ToString(), _session.MessageContext);
-                var valuesToWriteArray = decoder.ReadDiagnosticInfoArray("value");
-                return new DataValue(new Variant(valuesToWriteArray));
-            }
-            else
-            {
-                throw new NotImplementedException("Write of multidimensional DiagnosticInfo is not supported");
+                //Monodimensional Array
+                case 1:
+                {
+                    var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(state), _session.MessageContext);
+                    return new DataValue(new Variant(platformJsonDecoder.ReadDiagnosticInfoArray("Value")));
+                }
+                //OneOrMoreDimensionalArray
+                case 0:
+                    if (state.Value.GetJsonArrayDimensions().Length == 1) goto case 1;
+                    else goto default;
+                //Scalar
+                case -1:
+                {
+                    var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(state), _session.MessageContext);
+                    return new DataValue(new Variant(platformJsonDecoder.ReadDiagnosticInfo("Value")));
+                }
+                //Scalar, monodimensional or multidimensional Array
+                case -2:
+                    if (state.Value.Type == JTokenType.Array) goto case 0;
+                    else goto case -1;
+                //Scalar or monodimensional Array
+                case -3:
+                    if (state.Value.Type == JTokenType.Array) goto case 1;
+                    else goto case -1;
+                //Matrix with dimensions = VariableNode.Rank if Rank != 0 or any number of dimensions if Rank <=0
+                default:
+                {
+                    var dimensions = state.Value.GetJsonArrayDimensions();
+                    var jObjectForDecoder = new JObject {{"Value", state.Value.ToMonoDimensionalJsonArray(dimensions)}};
+                    var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(jObjectForDecoder), _session.MessageContext);
+                    
+                    //If the rank is > 1 and user has sent a monodimensional array, set the number of dimensions = rank
+                    //N.B. not possible lenght = 1 and rank < 0
+                    if (dimensions.Length == 1 && variableNode.ValueRank > 1)
+                    {
+                        var nofelemen = dimensions[0];
+                        dimensions = Array.ConvertAll(new int[variableNode.ValueRank], elem => 1);
+                        dimensions[0] = nofelemen;
+                    }
+                    var matrixToWrite = new Matrix(platformJsonDecoder.ReadDiagnosticInfoArray("Value").ToArray(), BuiltInType.DiagnosticInfo, dimensions);
+                    return new DataValue(new Variant(matrixToWrite));
+                }
             }
         }
 
@@ -2685,7 +2871,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2702,7 +2888,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 if (dimensions.Length == 1)
@@ -2748,7 +2934,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2779,7 +2965,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 JObject jObject;
@@ -2852,7 +3038,7 @@ namespace WebPlatform.OPCUALayer
                 //Check if the JSON sent by user is an array
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 //Check if it is a monodimensional array
                 if (dimensions.Length != 1)
                     throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
@@ -2882,7 +3068,7 @@ namespace WebPlatform.OPCUALayer
                 if (state.Value.Type != JTokenType.Array)
                     throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
                 Matrix matrixToWrite;
-                int[] dimensions = state.Value.GetDimensions();
+                int[] dimensions = state.Value.GetJsonArrayDimensions();
                 JToken[] flatValuesToWrite = state.Value.Children().ToArray();
                 //Check if it is a monodimensional array
                 JObject jObject;
@@ -2966,7 +3152,8 @@ namespace WebPlatform.OPCUALayer
 
             else throw new NotImplementedException("Write of arrays of extensionobjects is not supported");
         }
-
+        
+        
         private NodeId ParsePlatformNodeIdString(string str)
         {
             const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";

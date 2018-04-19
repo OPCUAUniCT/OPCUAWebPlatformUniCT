@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Razor.Language;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Schema;
 using NJsonSchema;
@@ -32,47 +33,53 @@ namespace WebPlatform.Extensions
         }
     }
 
-    public static class JSONExtensionMethods
+    public static class JsonExtensionMethods
     {
-        //Return the array [-1] if the JToken is not an array
-        public static int[] GetDimensions(this JToken jToken)
+        public static int[] GetJsonArrayDimensions(this JToken jToken)
         {
-            if (jToken.Type != JTokenType.Array) return new int[1] { -1 };
-            bool isLast = false;
-            while (!isLast)
+            if (jToken.Type != JTokenType.Array) 
+                throw new ValueToWriteTypeException("Expected a JSON Array but received a " + jToken.Type);
+            while (jToken.HasValues)
             {
-                try
+                var children = jToken.Children();
+                var count = children.First().Count();
+                
+                //if(children.All(x => x.Count() == count)) throw new ValueToWriteTypeException("The array sent must have the same number of element in each dimension");
+                
+                foreach (var child in children)
                 {
-                    jToken = jToken.Last;
+                    if(child.Count() != count)
+                        throw new ValueToWriteTypeException("The array sent must have the same number of element in each dimension");
                 }
-                catch
-                {
-                    isLast = true;
-                }
+                jToken = jToken.Last;
             }
 
-            String pattern = @"\[(\d+)\]";
-            Regex regex = new Regex(pattern);
-            MatchCollection matchColl = regex.Matches(jToken.Path);
-            int[] dimensions = new int[matchColl.Count];
-            for (int i = 0; i < matchColl.Count; i++)
+            const string pattern = @"\[(\d+)\]";
+            var regex = new Regex(pattern);
+            var matchColl = regex.Matches(jToken.Path);
+            var dimensions = new int[matchColl.Count];
+            for (var i = 0; i < matchColl.Count; i++)
             {
-                dimensions[i] = Int32.Parse(matchColl[i].Groups[1].Value) + 1;
+                dimensions[i] = int.Parse(matchColl[i].Groups[1].Value) + 1;
             }
             return dimensions;
         }
-
-        public static JTokenType GetInnermostTypeForJTokenArray(this JToken jToken)
+        
+        public static JArray ToMonoDimensionalJsonArray(this JToken jToken)
         {
-            if (jToken.Type != JTokenType.Array) return JTokenType.Undefined;
-            bool isLast = false;
-            while (!isLast)
-            {
-                jToken = jToken.Last;
-                isLast = jToken.Type != JTokenType.Array;
-            }
-            return jToken.Type;
+            var dimensions = jToken.GetJsonArrayDimensions();
+            return jToken.ToMonoDimensionalJsonArray(dimensions);
         }
+        
+        public static JArray ToMonoDimensionalJsonArray(this JToken jToken, int [] dimensions)
+        {
+            var flatValuesToWrite = jToken.Children().ToArray();
+            for (var i = 0; i < dimensions.Length - 1; i++)
+                flatValuesToWrite = flatValuesToWrite.SelectMany(a => a).ToArray();
+
+            return new JArray(flatValuesToWrite);
+        }
+
 
         /// <summary>
         /// This method return the @JTokenType of this JToken Array.
@@ -89,29 +96,5 @@ namespace WebPlatform.Extensions
             }
             return jtp;
         }
-
-        public static object DeserializeDataType(this JObject jObject, Type systemType)
-        {
-            var value = Activator.CreateInstance(systemType);
-            foreach (var propertyInfo in systemType.GetProperties())
-            {
-                if (!propertyInfo.CanWrite || !propertyInfo.SetMethod.IsPublic) 
-                    continue;
-                if(!jObject.ContainsKey(propertyInfo.Name)) 
-                    throw new ValueToWriteTypeException("Property " + propertyInfo.Name + " expected in the JSON Object");
-
-                /*
-                if(propertyInfo.PropertyType.IsPrimitive || propertyInfo.PropertyType == typeof(String))
-                    propertyInfo.SetValue(value, JsonConvert.DeserializeObject(nestedJToken.ToString(),propertyInfo.PropertyType));
-                else if (nestedJToken.Type == JTokenType.Object)
-                    propertyInfo.SetValue(value, nestedJToken.ToObject<JObject>().DeserializeDataType(propertyInfo.PropertyType));
-                else
-                    throw new ValueToWriteTypeException("Expected Object but received " + nestedJToken.Type);*/
-            }
-            return value;
-        }
-        
-        
     }
-    
 }

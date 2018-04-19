@@ -1070,7 +1070,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// <summary>
         /// Reads a ulong array from the stream.
         /// </summary>
-        public UInt64Collection ReadUInt64Array(string fieldName)
+        public new UInt64Collection ReadUInt64Array(string fieldName)
         {
             var values = new UInt64Collection();
 
