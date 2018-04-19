@@ -5,9 +5,11 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Opc.Ua;
 using WebPlatform.Exceptions;
+using WebPlatform.Extensions;
 using TypeInfo = Opc.Ua.TypeInfo;
 
 namespace WebPlatform.OPC_UA_Layer
@@ -26,7 +28,7 @@ namespace WebPlatform.OPC_UA_Layer
 
         #region Constructors
         
-        public PlatformJsonDecoder(string json, ServiceMessageContext context): base (json, context)
+        private PlatformJsonDecoder(string json, ServiceMessageContext context): base (json, context)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof (context));
@@ -45,6 +47,13 @@ namespace WebPlatform.OPC_UA_Layer
         }
 
         #endregion
+
+        public int[] Dimensions { get; set; }
+
+        public static PlatformJsonDecoder CreateDecoder(string json, ServiceMessageContext context)
+        {
+            return new PlatformJsonDecoder(json, context);
+        }
         
         #region Public Methods
         
@@ -97,7 +106,7 @@ namespace WebPlatform.OPC_UA_Layer
                 {
                     string name = (string)m_reader.Value;
 
-                    if (m_reader.Read() && m_reader.TokenType != JsonToken.EndObject)
+                     if (m_reader.Read() && m_reader.TokenType != JsonToken.EndObject)
                     {
                         switch (m_reader.TokenType)
                         {
@@ -811,7 +820,9 @@ namespace WebPlatform.OPC_UA_Layer
             {
                 return false;
             }
-
+            
+            var value = token as List<object>;
+            
             array = token as List<object>;
 
             if (array == null)

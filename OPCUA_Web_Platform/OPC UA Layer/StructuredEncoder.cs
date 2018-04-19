@@ -78,7 +78,7 @@ namespace WebPlatform.OPC_UA_Layer
                                 JToken[] jtArray = innerData.Children().ToArray();
                                 if (jtArray.Length != l)
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + l);
-                                if (jtArray.GetArrayType() != JTokenType.Object)
+                                if (jtArray.GetElementsType() != JTokenType.Object)
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON Object");
                                 for(int i = 0;  i<l; i++)
                                 {
@@ -181,7 +181,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Boolean)
+                if (jtArray.GetElementsType() != JTokenType.Boolean)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON Boolean");
                 Boolean[] valuesToWriteArray = Array.ConvertAll(jtArray, (item => item.ToObject<Boolean>()));
                 _be.WriteBooleanArray(fieldName, valuesToWriteArray);
@@ -212,7 +212,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 Int16[] valuesToWriteArray;
                 try
@@ -251,7 +251,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 Int32[] valuesToWriteArray;
                 try
@@ -290,7 +290,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 Int64[] valuesToWriteArray;
                 try
@@ -329,7 +329,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 UInt16[] valuesToWriteArray;
                 try
@@ -368,7 +368,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 UInt32[] valuesToWriteArray;
                 try
@@ -407,7 +407,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 UInt64[] valuesToWriteArray;
                 try
@@ -446,7 +446,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 Byte[] valuesToWriteArray;
                 try
@@ -485,7 +485,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 SByte[] valuesToWriteArray;
                 try
@@ -524,7 +524,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Number");
                 Single[] valuesToWriteArray;
                 try
@@ -563,7 +563,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Number");
                 Double[] valuesToWriteArray;
                 try
@@ -593,7 +593,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.String)
+                if (jtArray.GetElementsType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON String");
                 String[] valuesToWriteArray = Array.ConvertAll(jtArray, (item => item.ToObject<String>()));
                 _be.WriteStringArray(fieldName, valuesToWriteArray);
@@ -625,7 +625,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.String)
+                if (jtArray.GetElementsType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON String");
                 Guid[] valuesToWriteArray;
                 try
@@ -665,7 +665,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Date)
+                if (jtArray.GetElementsType() != JTokenType.Date)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Date");
                 DateTime[] valuesToWriteArray;
                 try
@@ -704,7 +704,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Integer)
+                if (jtArray.GetElementsType() != JTokenType.Integer)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Integer");
                 StatusCode[] valuesToWriteArray;
                 try
@@ -743,7 +743,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Object)
+                if (jtArray.GetElementsType() != JTokenType.Object)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Object");
                 LocalizedText[] valuesToWriteArray = new LocalizedText[lenghtOfArray];
                 JObject jObject;
@@ -777,7 +777,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.String)
+                if (jtArray.GetElementsType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON String");
                 NodeId[] valuesToWriteArray = Array.ConvertAll(jtArray, (item => ParsePlatformNodeIdString(item.ToObject<String>())));
                 _be.WriteNodeIdArray(fieldName, valuesToWriteArray);
@@ -809,7 +809,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Object)
+                if (jtArray.GetElementsType() != JTokenType.Object)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON Object");
                 JObject jObject;
                 NodeId nodeId;
@@ -845,7 +845,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.String)
+                if (jtArray.GetElementsType() != JTokenType.String)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON String");
                 Byte[][] valuesToWriteArray = Array.ConvertAll(jtArray, (item => Convert.FromBase64String(jToken.ToObject<String>())));
                 _be.WriteByteStringArray(fieldName, valuesToWriteArray);
@@ -876,7 +876,7 @@ namespace WebPlatform.OPC_UA_Layer
                 JToken[] jtArray = jToken.Children().ToArray();
                 if (jtArray.Length != lenghtOfArray)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The Array property named " + fieldName + " should be an Array with lenght = " + lenghtOfArray);
-                if (jtArray.GetArrayType() != JTokenType.Object)
+                if (jtArray.GetElementsType() != JTokenType.Object)
                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of Object");
                 QualifiedName[] valuesToWriteArray = new QualifiedName[lenghtOfArray];
                 JObject jObject;
