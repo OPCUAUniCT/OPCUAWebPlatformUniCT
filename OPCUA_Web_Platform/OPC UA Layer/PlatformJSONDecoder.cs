@@ -28,7 +28,7 @@ namespace WebPlatform.OPC_UA_Layer
 
         #region Constructors
         
-        private PlatformJsonDecoder(string json, ServiceMessageContext context): base (json, context)
+        private PlatformJsonDecoder(string json, ServiceMessageContext context, int[] dimensions): base (json, context)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof (context));
@@ -39,6 +39,7 @@ namespace WebPlatform.OPC_UA_Layer
             m_root = this.ReadObject();
             m_stack = new Stack<object>();
             m_stack.Push((object) this.m_root);
+            Dimensions = dimensions;
         }
         
         private void Initialize()
@@ -50,9 +51,9 @@ namespace WebPlatform.OPC_UA_Layer
 
         public int[] Dimensions { get; set; }
 
-        public static PlatformJsonDecoder CreateDecoder(string json, ServiceMessageContext context)
+        public static PlatformJsonDecoder CreateDecoder(string json, ServiceMessageContext context, int[] dimensions = null)
         {
-            return new PlatformJsonDecoder(json, context);
+            return new PlatformJsonDecoder(json, context, dimensions);
         }
         
         #region Public Methods

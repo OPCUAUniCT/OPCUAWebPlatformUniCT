@@ -1166,23 +1166,35 @@ namespace WebPlatform.OPCUALayer
             int actualValueRank = variableState.Value.CalculateActualValueRank();
             if(!ValueRanks.IsValid(actualValueRank, variableNode.ValueRank))
                 throw new ValueToWriteTypeException("Rank of the Value provided does not match the Variable ValueRank");
-            
-            var platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
+
+            PlatformJsonDecoder platformJsonDecoder;
             var type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
 
             switch (actualValueRank)
             {
                 case -1:
+                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
                     return GetDataValue(type.GetDecodeDelegate(platformJsonDecoder));
                 case 1:
+                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
                     return GetDataValue(type.GetDecodeArrayDelegate(platformJsonDecoder));
                 default:
-                    platformJsonDecoder.Dimensions = variableState.Value.GetJsonArrayDimensions();
+                    var dimensions = variableState.Value.GetJsonArrayDimensions();
                     variableState.Value = variableState.Value.ToOneDimensionJArray();
+                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(
+                        JsonConvert.SerializeObject(variableState), 
+                        _session.MessageContext, 
+                        dimensions
+                    );
                     return GetDataValue(type.GetDecodeMatrixDelegate(platformJsonDecoder));
              }
         }
 
+        private DataValue GetDataValue(Func<Variant> decode)
+        {
+            var valueToWrite = decode();
+            return new DataValue(valueToWrite);
+        }
 
         /*private DataValue GetDataValueForScalar(VariableState variableState, VariableNode variableNode)
         {
@@ -1216,19 +1228,8 @@ namespace WebPlatform.OPCUALayer
             return new DataValue(new Variant(valueToWrite));
         }*/
 
-        private DataValue GetDataValue(Func<Variant> decode)
-        {
-            var valueToWrite = decode();
-            return new DataValue(valueToWrite);
-        }
-
-
-
-
-
-
-
-        private DataValue GetDataValueForBuiltIn(BuiltInType builtInType, JToken userValue, int uaRank)
+        
+        /*private DataValue GetDataValueForBuiltIn(BuiltInType builtInType, JToken userValue, int uaRank)
         {
 
             var value = userValue;
@@ -1300,7 +1301,7 @@ namespace WebPlatform.OPCUALayer
             }
 
             else throw new NotImplementedException("Write of arrays of extensionobjects is not supported");
-        }
+        }*/
         
         private DataValue GetDataValueForEnumeration(VariableNode variableNode, VariableState state)
         {
