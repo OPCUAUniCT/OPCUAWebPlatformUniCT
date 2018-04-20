@@ -1200,9 +1200,9 @@ namespace WebPlatform.OPCUALayer
         }
 
         
-        /*
+        
 
-        private DataValue GetDataValueForStructured(VariableNode variableNode, VariableState state)
+        /*private DataValue GetDataValueForStructured(VariableNode variableNode, VariableState state)
         {
             if (variableNode.ValueRank == -1)
             {
@@ -1234,62 +1234,6 @@ namespace WebPlatform.OPCUALayer
 
             else throw new NotImplementedException("Write of arrays of extensionobjects is not supported");
         }*/
-        
-        private DataValue GetDataValueForEnumeration(VariableNode variableNode, VariableState state)
-        {
-            if (variableNode.ValueRank == -1)
-            {
-                
-            }
-            else if (variableNode.ValueRank == 1)
-            {
-                //Check if the JSON sent by user is an array
-                if (state.Value.Type != JTokenType.Array)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Array but received a JSON " + state.Value.Type);
-                int[] dimensions = state.Value.GetJsonArrayDimensions();
-                //Check if it is a monodimensional array
-                if (dimensions.Length != 1)
-                    throw new ValueToWriteTypeException("Array dimensions error: expected 1d array but received " + dimensions.Length + "d");
-                JToken[] flatValuesToWrite = state.Value.Children().ToArray();
-                //Check that all values are Object
-                if (flatValuesToWrite.GetElementsType() != JTokenType.Object)
-                    throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Object Array as expected");
-                Int32[] valuesToWriteArray = new Int32[flatValuesToWrite.Length];
-                JObject jObject;
-                
-                for (int i = 0; i < flatValuesToWrite.Length; i++)
-                {
-                    jObject = flatValuesToWrite[i].ToObject<JObject>();
-                    if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
-                        throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
-                    JToken jtIndex = jObject["EnumIndex"];
-                    JToken jtValue = jObject["EnumValue"];
-                    if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
-                        throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
-                    int valueToWrite = jtIndex.ToObject<Int32>();
-                    int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
-
-                    if (enstrreturn == 1)
-                    {
-                        if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
-                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
-                    }
-                    else if (enstrreturn == 2)
-                    {
-                        var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
-                        if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
-                            throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
-                    }
-                    valuesToWriteArray[i] = valueToWrite;
-                }
-
-                return new DataValue(new Variant(valuesToWriteArray));
-            }
-            else
-            {
-                throw new NotImplementedException("Write Matrix of Enumeration not supported");
-            }
-        }
         
         private NodeId ParsePlatformNodeIdString(string str)
         {

@@ -6,12 +6,14 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Opc.Ua;
 using Opc.Ua.Client;
 using WebPlatform.Exceptions;
 using WebPlatform.Extensions;
+using WebPlatform.OPCUALayer;
+using TypeInfo = Opc.Ua.TypeInfo;
 
 namespace WebPlatform.OPC_UA_Layer
 {
@@ -23,6 +25,7 @@ namespace WebPlatform.OPC_UA_Layer
         private Stack<object> m_stack;
         private Session m_session;
         private NodeId m_currentDataType;
+        private JObject m_currentJObject;
         private ServiceMessageContext m_context;
         private ushort[] m_namespaceMappings;
         private ushort[] m_serverMappings;
@@ -38,6 +41,7 @@ namespace WebPlatform.OPC_UA_Layer
             this.Initialize();
             m_session = session;
             m_currentDataType = dataTypeId;
+            m_currentJObject = JsonConvert.DeserializeObject<JObject>(json);
             m_context = session.MessageContext;
             m_nestingLevel = 0U;
             m_reader = new JsonTextReader((TextReader) new StringReader(json));
@@ -873,6 +877,47 @@ namespace WebPlatform.OPC_UA_Layer
             
             return enumIndex;
         }
+        
+        /// <summary>
+        /// Reads an extension object from the stream.
+        /// </summary>
+        public new ExtensionObject ReadExtensionObject(string fieldName)
+        {
+            var jObject = m_currentJObject["Value"].ToObject<JObject>();
+            
+            if (m_currentDataType.NamespaceIndex != 0)
+            {
+                var analyzer = new DataTypeAnalyzer(m_session);
+                var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(m_currentDataType);
+                var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                string dictionary = analyzer.GetDictionary(descriptionNodeId);
+                string descriptionId = m_session.ReadNodeAttribute(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+
+                StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
+                var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObject, m_session.MessageContext, encodingNodeId);
+
+                return value;
+            }
+
+            var systemType = TypeInfo.GetSystemType(m_currentDataType, m_session.Factory);
+            var jsonDecoder = CreateDecoder(jObject.ToString(), m_currentDataType, m_session);
+
+            if (!(Activator.CreateInstance(systemType) is IEncodeable valueToWrite))
+            {
+                throw new ValueToWriteTypeException("Found a Standard Structured DataType not IEncodable");
+            }
+            
+            valueToWrite.Decode(jsonDecoder);
+            return new ExtensionObject(m_currentDataType, valueToWrite);
+        }
+        
+        
+        
+        
+        
+        
+        
+        
 
         private bool ReadArrayField(string fieldName, out List<object> array)
         {

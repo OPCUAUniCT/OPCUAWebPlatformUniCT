@@ -174,7 +174,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.LocalizedText:
                     return () => new Variant(decoder.ReadLocalizedText("Value"));
                 case BuiltInType.ExtensionObject:
-                    throw new NotImplementedException();
+                    return () => new Variant(decoder.ReadExtensionObject("Value"));
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(decoder.ReadDiagnosticInfo("Value"));
                 case BuiltInType.Enumeration:
@@ -193,7 +193,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.SByte:
                     return () => new Variant(decoder.ReadSByteArray("Value").ToArray());
                 case BuiltInType.Byte:
-                    return () => new Variant(decoder.ReadSByteArray("Value").ToArray());
+                    return () => new Variant(decoder.ReadByteArray("Value").ToArray());
                 case BuiltInType.Int16:
                     return () => new Variant(decoder.ReadInt16Array("Value").ToArray());
                 case BuiltInType.UInt16:
