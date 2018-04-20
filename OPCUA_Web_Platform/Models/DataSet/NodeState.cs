@@ -9,9 +9,6 @@ namespace WebPlatform.Models.DataSet
     public class VariableState
     {
         public JToken Value { get; set; }
-        public bool isValid
-        {
-            get { return Value != null; }
-        }
+        public bool IsValid => Value != null;
     }
 }

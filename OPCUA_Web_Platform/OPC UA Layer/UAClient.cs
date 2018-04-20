@@ -12,6 +12,7 @@ using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
 using WebPlatform.Monitoring;
 using WebPlatform.Models.DataSet;
+using WebPlatform.OPC_UA_Layer;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -56,7 +57,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
         {
             Session session = await GetSessionAsync(serverUrl);
-            NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
+            NodeId nodeToRead = PlatformUtils.ParsePlatformNodeIdString(nodeIdStr);
             var node = session.ReadNode(nodeToRead);
             return node;
         }
@@ -84,9 +85,8 @@ namespace WebPlatform.OPCUALayer
             };
 
             writeValues.Add(writeValue);
-            StatusCodeCollection results = new StatusCodeCollection();
-            
-            session.Write(null, writeValues, out results, out _);
+
+            session.Write(null, writeValues, out var results, out _);
             if (!StatusCode.IsGood(results[0])) {
                 if (results[0] == StatusCodes.BadTypeMismatch)
                     throw new ValueToWriteTypeException("Wrong Type Error: data sent are not of the type expected. Check your data and try again");
@@ -98,7 +98,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<IEnumerable<EdgeDescription>> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
             Session session = await GetSessionAsync(serverUrl);
-            NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeToBrowseIdStr);
+            NodeId nodeToBrowseId = PlatformUtils.ParsePlatformNodeIdString(nodeToBrowseIdStr);
 
             var browser = new Browser(session)
             {
@@ -118,7 +118,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<bool> IsFolderTypeAsync(string serverUrl, string nodeIdStr)
         {
             Session session = await GetSessionAsync(serverUrl);
-            NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeIdStr);
+            NodeId nodeToBrowseId = PlatformUtils.ParsePlatformNodeIdString(nodeIdStr);
 
             //Set a Browser object to follow HasTypeDefinition Reference only
             var browser = new Browser(session)
@@ -208,10 +208,9 @@ namespace WebPlatform.OPCUALayer
         public async Task<bool[]> CreateMonitoredItemsAsync(string serverUrl, MonitorableNode[] monitorableNodes,
             string brokerUrl, string topic)
         {
-            Session session = await GetSessionAsync(serverUrl);
-            
-            MonitoredItem mi = null;
-            MonitorPublishInfo monitorInfo = null;
+            var session = await GetSessionAsync(serverUrl);
+
+            MonitorPublishInfo monitorInfo;
 
             const string pattern = @"^(mqtt|signalr):(.*)$";
             var match = Regex.Match(brokerUrl, pattern);
@@ -235,7 +234,7 @@ namespace WebPlatform.OPCUALayer
                         {
                             Topic = topic,
                             BrokerUrl = url,
-                            Subscription = CreateSubscription(serverUrl, session, publishInterval, 0),
+                            Subscription = CreateSubscription(session, publishInterval, 0),
                             Publisher = publisher
                         };
                         _monitorPublishInfo[serverUrl].Add(monitorInfo);
@@ -252,11 +251,10 @@ namespace WebPlatform.OPCUALayer
                     {
                         Topic = topic,
                         BrokerUrl = url,
-                        Subscription = CreateSubscription(serverUrl, session, publishInterval, 0),
+                        Subscription = CreateSubscription(session, publishInterval, 0),
                         Publisher = publisher
                     };
-                    var list = new List<MonitorPublishInfo>();
-                    list.Add(monitorInfo);
+                    var list = new List<MonitorPublishInfo> { monitorInfo };
                     _monitorPublishInfo.Add(serverUrl, list);
                 }
             }
@@ -265,9 +263,9 @@ namespace WebPlatform.OPCUALayer
 
             foreach (var monitorableNode in monitorableNodes)
             {
-                mi = new MonitoredItem()
+                var mi = new MonitoredItem()
                 {
-                    StartNodeId = ParsePlatformNodeIdString(monitorableNode.NodeId),
+                    StartNodeId = PlatformUtils.ParsePlatformNodeIdString(monitorableNode.NodeId),
                     DisplayName = monitorableNode.NodeId,
                     SamplingInterval = monitorableNode.SamplingInterval
                 };
@@ -315,7 +313,7 @@ namespace WebPlatform.OPCUALayer
             
                 try
                 {
-                    session.DeleteSubscriptions(null, new UInt32Collection(new[] {monitorPublishInfo.Subscription.Id}), out var results, out var diagnosticInfos);
+                    session.DeleteSubscriptions(null, new UInt32Collection(new[] {monitorPublishInfo.Subscription.Id}), out var _, out var _);
                 }
                 catch (ServiceResultException e)
                 {
@@ -358,7 +356,7 @@ namespace WebPlatform.OPCUALayer
             }
         }
 
-        private Subscription CreateSubscription(string serverUrl, Session session, int publishingInterval, uint maxNotificationPerPublish)
+        private static Subscription CreateSubscription(Session session, int publishingInterval, uint maxNotificationPerPublish)
         {
             var sub = new Subscription(session.DefaultSubscription)
             {
@@ -409,7 +407,7 @@ namespace WebPlatform.OPCUALayer
             {
                 endpointDescription = CoreClientUtils.SelectEndpoint(serverUrl, true, 15000);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 throw new DataSetNotAvailableException();
             }
@@ -475,24 +473,6 @@ namespace WebPlatform.OPCUALayer
                     e.Certificate.Subject);
             }
         }
-
-        private NodeId ParsePlatformNodeIdString(string str)
-		{
-			const string pattern = @"^(\d+)-(?:(\d+)|(.+))$";
-			var match = Regex.Match(str, pattern);
-		    if (match.Success)
-		    {
-		        var isString = match.Groups[3].Length != 0;
-		        var isNumeric = match.Groups[2].Length != 0;
-			
-		        var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
-		        var builtStr = $"ns={match.Groups[1]};" + idStr;
-			
-		        return new NodeId(builtStr);
-		    }
-
-		    return null;
-		}
 
         #endregion
     }
