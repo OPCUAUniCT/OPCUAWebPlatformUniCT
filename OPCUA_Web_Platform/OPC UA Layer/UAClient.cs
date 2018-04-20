@@ -10,6 +10,7 @@ using WebPlatform.Models.OPCUA;
 using WebPlatform.Exceptions;
 using WebPlatform.Monitoring;
 using WebPlatform.Models.DataSet;
+using WebPlatform.OPC_UA_Layer;
 
 namespace WebPlatform.OPCUALayer
 {
@@ -67,7 +68,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<Node> ReadNodeAsync(string serverUrl, string nodeIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
-            NodeId nodeToRead = ParsePlatformNodeIdString(nodeIdStr);
+            NodeId nodeToRead = PlatformUtils.ParsePlatformNodeIdString(nodeIdStr);
             Node node;
             node = session.ReadNode(nodeToRead);
             return node;
@@ -110,7 +111,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<IEnumerable<EdgeDescription>> BrowseAsync(string serverUrl, string nodeToBrowseIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
-            NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeToBrowseIdStr);
+            NodeId nodeToBrowseId = PlatformUtils.ParsePlatformNodeIdString(nodeToBrowseIdStr);
 
             var browser = new Browser(session)
             {
@@ -130,7 +131,7 @@ namespace WebPlatform.OPCUALayer
         public async Task<bool> IsFolderTypeAsync(string serverUrl, string nodeIdStr)
         {
             Session session = await GetSessionByUrlAsync(serverUrl);
-            NodeId nodeToBrowseId = ParsePlatformNodeIdString(nodeIdStr);
+            NodeId nodeToBrowseId = PlatformUtils.ParsePlatformNodeIdString(nodeIdStr);
 
             //Set a Browser object to follow HasTypeDefinition Reference only
             var browser = new Browser(session)
@@ -279,7 +280,7 @@ namespace WebPlatform.OPCUALayer
             {
                 mi = new MonitoredItem()
                 {
-                    StartNodeId = ParsePlatformNodeIdString(monitorableNode.NodeId),
+                    StartNodeId = PlatformUtils.ParsePlatformNodeIdString(monitorableNode.NodeId),
                     DisplayName = monitorableNode.NodeId,
                     SamplingInterval = monitorableNode.SamplingInterval
                 };
@@ -540,24 +541,6 @@ namespace WebPlatform.OPCUALayer
                 return endpoints;
             }
         }
-
-        private NodeId ParsePlatformNodeIdString(string str)
-		{
-			const string pattern = @"^(\d+)-(?:(\d+)|(.+))$";
-			var match = Regex.Match(str, pattern);
-		    if (match.Success)
-		    {
-		        var isString = match.Groups[3].Length != 0;
-		        var isNumeric = match.Groups[2].Length != 0;
-			
-		        var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
-		        var builtStr = $"ns={match.Groups[1]};" + idStr;
-			
-		        return new NodeId(builtStr);
-		    }
-
-		    return null;
-		}
 
         #endregion
     }

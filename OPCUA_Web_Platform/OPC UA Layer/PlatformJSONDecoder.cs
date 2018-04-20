@@ -27,9 +27,6 @@ namespace WebPlatform.OPC_UA_Layer
         private NodeId m_currentDataType;
         private JObject m_currentJObject;
         private ServiceMessageContext m_context;
-        private ushort[] m_namespaceMappings;
-        private ushort[] m_serverMappings;
-        private uint m_nestingLevel;
         #endregion
 
         #region Constructors
@@ -43,7 +40,6 @@ namespace WebPlatform.OPC_UA_Layer
             m_currentDataType = dataTypeId;
             m_currentJObject = JsonConvert.DeserializeObject<JObject>(json);
             m_context = session.MessageContext;
-            m_nestingLevel = 0U;
             m_reader = new JsonTextReader((TextReader) new StringReader(json));
             m_root = this.ReadObject();
             m_stack = new Stack<object>();
@@ -596,7 +592,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " is not a String as expected");
             }
 
-            return ParsePlatformNodeIdString(value);
+            return PlatformUtils.ParsePlatformNodeIdString(value);
         }
         
         /// <summary>
@@ -1686,34 +1682,7 @@ namespace WebPlatform.OPC_UA_Layer
 
         #region Private Methods
         
-        private NodeId ParsePlatformNodeIdString(string str)
-        {
-            const string pattern = @"^(\d+)-(?:(\d+)|(\S+))$";
-            var match = Regex.Match(str, pattern);
-            var isString = match.Groups[3].Length != 0;
-            var isNumeric = match.Groups[2].Length != 0;
-
-            var idStr = (isString) ? $"s={match.Groups[3]}" : $"i={match.Groups[2]}";
-            var builtStr = $"ns={match.Groups[1]};" + idStr;
-            NodeId nodeId = null;
-            try
-            {
-                nodeId = new NodeId(builtStr);
-            }
-            catch (ServiceResultException exc)
-            {
-                switch (exc.StatusCode)
-                {
-                    case StatusCodes.BadNodeIdInvalid:
-                        throw new ValueToWriteTypeException("Wrong Type Error: String is not formatted as expected (number-yyy where yyy can be string or number or guid)");
-                    default:
-                        throw new ValueToWriteTypeException(exc.Message);
-                }
-            }
-            
-
-            return nodeId;
-        }
+        
         #endregion
     }
 }

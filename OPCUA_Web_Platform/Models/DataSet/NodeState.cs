@@ -10,7 +10,5 @@ namespace WebPlatform.Models.DataSet
     {
         public JToken Value { get; set; }
         public bool IsValid => Value != null;
-        
-        
     }
 }
