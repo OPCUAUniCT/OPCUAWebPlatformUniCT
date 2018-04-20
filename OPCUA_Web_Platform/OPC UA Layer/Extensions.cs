@@ -122,11 +122,6 @@ namespace WebPlatform.Extensions
     
     public static class BuiltInExtensionMethods
     {
-        public static List<T> FlatList<T>(this List<List<T>> list)
-        {
-            return list.SelectMany(a => a).ToList();
-        }
-
         public static Func<Variant> GetDecodeDelegate(this BuiltInType builtIn, PlatformJsonDecoder decoder)
         {
             switch (builtIn)

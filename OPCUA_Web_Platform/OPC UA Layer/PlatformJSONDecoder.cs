@@ -886,11 +886,11 @@ namespace WebPlatform.OPC_UA_Layer
                 var analyzer = new DataTypeAnalyzer(m_session);
                 var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(m_currentDataType);
                 var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
-                string dictionary = analyzer.GetDictionary(descriptionNodeId);
-                string descriptionId = m_session.ReadNodeAttribute(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+                var dictionary = analyzer.GetDictionary(descriptionNodeId);
+                var descriptionId = m_session.ReadNodeAttribute(descriptionNodeId, Attributes.Value)[0].Value.ToString();
 
-                StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
-                var value = structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObject, m_session.MessageContext, encodingNodeId);
+                var structuredEncoder = new StructuredEncoder(dictionary);
+                var value = structuredEncoder.BuildExtensionObjectFromJsonObject(descriptionId, jObject, m_session.MessageContext, encodingNodeId);
 
                 return value;
             }
@@ -925,7 +925,7 @@ namespace WebPlatform.OPC_UA_Layer
                 StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
                 foreach (var jObj in jArray)
                 {
-                   extensionObjectCollection.Add(structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObj.ToObject<JObject>(),
+                   extensionObjectCollection.Add(structuredEncoder.BuildExtensionObjectFromJsonObject(descriptionId, jObj.ToObject<JObject>(),
                         m_session.MessageContext, encodingNodeId));
                 }
 

@@ -37,14 +37,14 @@ namespace WebPlatform.OPC_UA_Layer
             }
         }
 
-        public ExtensionObject BuildExtensionObjectFromJSONObject(string descriptionId, JObject dataToEncode, ServiceMessageContext serviceMessageContext, NodeId dataTypeEncodingNodeId)
+        public ExtensionObject BuildExtensionObjectFromJsonObject(string descriptionId, JObject dataToEncode, ServiceMessageContext serviceMessageContext, NodeId dataTypeEncodingNodeId)
         {   
             _be = new BinaryEncoder(serviceMessageContext);
-            EncodeJSONObject(descriptionId, dataToEncode);
+            EncodeJsonObject(descriptionId, dataToEncode);
             return new ExtensionObject(dataTypeEncodingNodeId, _be.CloseAndReturnBuffer());
         }
 
-        private void EncodeJSONObject(string descriptionId, JObject dataToEncode)
+        private void EncodeJsonObject(string descriptionId, JObject dataToEncode)
         {
             XPathNodeIterator iterator = _nav.Select($"/opc:TypeDictionary/opc:StructuredType[@Name='{descriptionId}']", _ns);
             while (iterator.MoveNext())
@@ -69,7 +69,7 @@ namespace WebPlatform.OPC_UA_Layer
                             {
                                 if(innerData.Type != JTokenType.Object)
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be a JSON Object");
-                                EncodeJSONObject(typeName.Split(':')[1], innerData.ToObject<JObject>());
+                                EncodeJsonObject(typeName.Split(':')[1], innerData.ToObject<JObject>());
                             }
                             else
                             {
@@ -82,7 +82,7 @@ namespace WebPlatform.OPC_UA_Layer
                                     throw new ValueToWriteTypeException("Wrong Object Properties: The property named " + fieldName + " should be an Array of JSON Object");
                                 for(int i = 0;  i<l; i++)
                                 {
-                                    EncodeJSONObject(typeName.Split(':')[1], jtArray[i].ToObject<JObject>());
+                                    EncodeJsonObject(typeName.Split(':')[1], jtArray[i].ToObject<JObject>());
                                 }
                             }
                         }
