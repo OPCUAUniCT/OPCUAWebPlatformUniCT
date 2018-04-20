@@ -898,7 +898,6 @@ namespace WebPlatform.OPC_UA_Layer
         private int LengthField(string lengthFieldSource, JObject currentJson)
         {
             if (string.IsNullOrEmpty(lengthFieldSource)) return 1;
-            Console.WriteLine($"Source length -> {lengthFieldSource}");
             if (!currentJson.ContainsKey(lengthFieldSource))
                 throw new ValueToWriteTypeException("Wrong Object Properties: Expected a property named " + lengthFieldSource);
             if(currentJson[lengthFieldSource].Type != JTokenType.Integer)

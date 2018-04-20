@@ -104,7 +104,6 @@ namespace WebPlatform.OPCUALayer
         private int LengthField(string lengthFieldSource, JToken currentJson)
         {
             if (string.IsNullOrEmpty(lengthFieldSource)) return 1;
-            Console.WriteLine($"Source length -> {lengthFieldSource}");
             return int.Parse((string)currentJson[lengthFieldSource]);
 
         }
