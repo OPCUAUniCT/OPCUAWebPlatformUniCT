@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Razor.Language;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Schema;
 using NJsonSchema;
+using Opc.Ua.Client;
 using WebPlatform.Exceptions;
 using WebPlatform.Models.DataSet;
 using WebPlatform.OPC_UA_Layer;
@@ -104,7 +105,7 @@ namespace WebPlatform.Extensions
         public static JTokenType GetElementsType(this JToken[] jTokens)
         {
             if(!jTokens.ElementsHasSameType())
-                throw new ValueToWriteTypeException("The array sent must have the same number of element in each dimension");
+                throw new ValueToWriteTypeException("The array sent must have the same type of element in each dimension");
             return jTokens.First().Type;
         }
 
@@ -177,7 +178,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(decoder.ReadDiagnosticInfo("Value"));
                 case BuiltInType.Enumeration:
-                    throw new NotImplementedException();
+                    return () => new Variant(decoder.ReadEnumeration("Value"));
                 default:
                     throw new NotImplementedException();
             }
@@ -234,7 +235,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(decoder.ReadDiagnosticInfoArray("Value").ToArray());
                 case BuiltInType.Enumeration:
-                    throw new NotImplementedException();
+                    return () => new Variant(decoder.ReadEnumerationArray("Value").ToArray());
                 default:
                     throw new NotImplementedException();
             }
@@ -291,10 +292,78 @@ namespace WebPlatform.Extensions
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(new Matrix(decoder.ReadDiagnosticInfoArray("Value").ToArray(), builtIn, decoder.Dimensions));
                 case BuiltInType.Enumeration:
-                    throw new NotImplementedException();
+                    return () => new Variant(new Matrix(decoder.ReadEnumerationArray("Value").ToArray(), builtIn, decoder.Dimensions));
                 default:
                     throw new NotImplementedException();
             }
+        }
+    }
+
+    public static class SessionExtensionMethods
+    {
+        public static (LocalizedText[] enumStrings, EnumValueType[] enumValues) GetEnumStrings(this Session session, NodeId dataTypeId)
+        {
+            var referenceCollection = session.GetPropertiesReferenceCollection(dataTypeId);
+
+            foreach (var dataValueCollection in referenceCollection
+                                                     .Where(referenceDescription => referenceDescription.BrowseName.Name.Equals("EnumStrings"))
+                                                     .Select(descr => ExpandedNodeId.ToNodeId(descr.NodeId, session.MessageContext.NamespaceUris))
+                                                     .Select(enid => session.ReadNodeAttribute(enid, Attributes.Value)))
+            {
+                return (enumStrings: (LocalizedText[]) dataValueCollection[0].Value, enumValues: null);
+            }
+            
+            foreach (var dataValueCollection in referenceCollection
+                .Where(referenceDescription => referenceDescription.BrowseName.Name.Equals("EnumValues"))
+                .Select(descr => ExpandedNodeId.ToNodeId(descr.NodeId, session.MessageContext.NamespaceUris))
+                .Select(enid => session.ReadNodeAttribute(enid, Attributes.Value)))
+            {
+                var evs = ((ExtensionObject[]) dataValueCollection[0].Value).Select(eo => eo.Body)
+                    .Cast<EnumValueType>().ToArray();
+                return (enumStrings: null, enumValues: evs);
+            }
+
+            return (null, null);
+        }
+
+        public static ReferenceDescriptionCollection GetPropertiesReferenceCollection(this Session session, NodeId dataTypeId)
+        {
+            session.Browse(
+                null,
+                null,
+                dataTypeId,
+                0u,
+                BrowseDirection.Forward,
+                ReferenceTypeIds.HasProperty,
+                true,
+                (uint)NodeClass.Variable,
+                out _,
+                out var refDescriptionCollection);
+
+            return refDescriptionCollection;
+        }
+
+        public static DataValueCollection ReadNodeAttribute(this Session session, NodeId nodeId, uint attributeId)
+        {
+            var nodeToRead = new ReadValueIdCollection();
+
+            var vId = new ReadValueId()
+            {
+                NodeId = nodeId,
+                AttributeId = attributeId
+            };
+
+            nodeToRead.Add(vId);
+
+            session.Read(null,
+                0,
+                TimestampsToReturn.Both,
+                nodeToRead,
+                out var dataValueCollection,
+                out _
+            );
+
+            return dataValueCollection;
         }
     }
 }

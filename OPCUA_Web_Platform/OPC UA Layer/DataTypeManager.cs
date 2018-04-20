@@ -951,9 +951,6 @@ namespace WebPlatform.OPCUALayer
 
         private int GetEnumStrings(NodeId dataTypeNodeId, out LocalizedText[] enumStrings, out EnumValueType[] enumValues)
         {
-            ReferenceDescriptionCollection refDescriptionCollection;
-            byte[] continuationPoint;
-
             _session.Browse(
                 null,
                 null,
@@ -963,8 +960,8 @@ namespace WebPlatform.OPCUALayer
                 ReferenceTypeIds.HasProperty,  //HasProperty reference
                 true,
                 (uint)NodeClass.Variable, //looking for Variable
-                out continuationPoint,
-                out refDescriptionCollection);
+                out _,
+                out var refDescriptionCollection);
 
             //Because it is enum it will reference Property (variabile) EnumStrings.
 
@@ -1173,19 +1170,25 @@ namespace WebPlatform.OPCUALayer
             switch (actualValueRank)
             {
                 case -1:
-                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
+                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(
+                        JsonConvert.SerializeObject(variableState), 
+                        variableNode.DataType, 
+                        _session);
                     return GetDataValue(type.GetDecodeDelegate(platformJsonDecoder));
                 case 1:
-                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
+                    platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(
+                        JsonConvert.SerializeObject(variableState), 
+                        variableNode.DataType, 
+                        _session);
                     return GetDataValue(type.GetDecodeArrayDelegate(platformJsonDecoder));
                 default:
                     var dimensions = variableState.Value.GetJsonArrayDimensions();
                     variableState.Value = variableState.Value.ToOneDimensionJArray();
                     platformJsonDecoder = PlatformJsonDecoder.CreateDecoder(
-                        JsonConvert.SerializeObject(variableState), 
-                        _session.MessageContext, 
-                        dimensions
-                    );
+                        JsonConvert.SerializeObject(variableState),
+                        variableNode.DataType,
+                        _session, 
+                        dimensions);
                     return GetDataValue(type.GetDecodeMatrixDelegate(platformJsonDecoder));
              }
         }
@@ -1196,79 +1199,8 @@ namespace WebPlatform.OPCUALayer
             return new DataValue(valueToWrite);
         }
 
-        /*private DataValue GetDataValueForScalar(VariableState variableState, VariableNode variableNode)
-        {
-            var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext);
-            var type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
-            
-            var valueToWrite = type.Decode(platformJsonDecoder);
-            
-            return new DataValue(new Variant(valueToWrite));
-        }
         
-        private DataValue GetDataValueForArray(VariableState variableState, VariableNode variableNode)
-        {
-            var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext, null);
-            var type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
-            
-            var valueToWrite = type.DecodeArray(platformJsonDecoder);
-            
-            return new DataValue(new Variant(valueToWrite));
-        }
-        
-        private DataValue GetDataValueForMatrix(VariableState variableState, VariableNode variableNode)
-        {
-            variableState.Value = variableState.Value.ToOneDimensionJArray();
-                
-            var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(variableState), _session.MessageContext,variableState.Value.GetJsonArrayDimensions());
-            var type = TypeInfo.GetBuiltInType(variableNode.DataType, _session.SystemContext.TypeTable);
-            
-            var valueToWrite = type.DecodeMatrix(platformJsonDecoder);
-            
-            return new DataValue(new Variant(valueToWrite));
-        }*/
-
-        
-        /*private DataValue GetDataValueForBuiltIn(BuiltInType builtInType, JToken userValue, int uaRank)
-        {
-
-            var value = userValue;
-            var methodToCall = "Read" + builtInType;
-            
-            if (userValue.Type == JTokenType.Array)
-            {
-                value = userValue.ToOneDimensionJArray();
-                methodToCall += "Array";
-            }
-            var jObject = new JObject {{"Value", value}};
-            var platformJsonDecoder = new PlatformJsonDecoder(JsonConvert.SerializeObject(jObject), _session.MessageContext);
-            var mInfo = typeof(PlatformJsonDecoder).GetMethod(methodToCall, new[] { typeof(string) });
-            
-            try
-            {
-                var builtInValue = mInfo.Invoke(platformJsonDecoder, new object[] {"Value"});
-
-                if (userValue.Type != JTokenType.Array) return new DataValue(new Variant(builtInValue));
-                
-                //In case of Array dimensions array must be modified if user has sent a monodimensional array and want to write in a multidimensional array
-                var dimensions = userValue.GetJsonArrayDimensions();
-                if (dimensions.Length == 1 && uaRank > 1)
-                {
-                    var nofelemen = dimensions[0];
-                    dimensions = Array.ConvertAll(new int[uaRank], elem => 1);
-                    dimensions[0] = nofelemen;
-                }
-                var valueToWriteArray = builtInValue.GetType().GetMethod("ToArray").Invoke(builtInValue, new object[]{}) as Array;
-                return dimensions.Length > 1 ? new DataValue(new Variant(new Matrix(valueToWriteArray, builtInType, dimensions))) : new DataValue(new Variant(valueToWriteArray));
-                         }
-            catch (TargetInvocationException exception)
-            {
-                throw exception.InnerException;
-            }
-
-
-
-        }
+        /*
 
         private DataValue GetDataValueForStructured(VariableNode variableNode, VariableState state)
         {
@@ -1307,32 +1239,7 @@ namespace WebPlatform.OPCUALayer
         {
             if (variableNode.ValueRank == -1)
             {
-                //Check if the JSON sent by user is an Object
-                if (state.Value.Type != JTokenType.Object)
-                    throw new ValueToWriteTypeException("Wrong Type Error: Expected a JSON Object Value but received a JSON " + state.Value.Type);
-                JObject jObject = state.Value.ToObject<JObject>();
-                if (!jObject.ContainsKey("EnumIndex") || !jObject.ContainsKey("EnumValue"))
-                    throw new ValueToWriteTypeException("Object must have the Properties \"EnumIndex\" and \"EnumValue\"");
-                JToken jtIndex = jObject["EnumIndex"];
-                JToken jtValue = jObject["EnumValue"];
-                if (jtIndex.Type != JTokenType.Integer && jtValue.Type != JTokenType.String)
-                    throw new ValueToWriteTypeException("\"EnumIndex\" and \"EnumValue\" properties must be an Integer and a String");
-                int valueToWrite = jtIndex.ToObject<Int32>();
-                int enstrreturn = GetEnumStrings(variableNode.DataType, out var enumString, out var enumValues);
-
-                if(enstrreturn == 1)
-                {
-                    if (enumString[valueToWrite] != jtValue.ToObject<String>() || valueToWrite < 0 || valueToWrite > enumString.Length)
-                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
-                }
-                else if(enstrreturn == 2)
-                {
-                    var enVal = enumValues.SingleOrDefault(s => s.Value == valueToWrite);
-                    if (enVal == null || enVal.DisplayName.Text != jtValue.ToObject<String>())
-                        throw new ValueToWriteTypeException("Wrong corrispondence between \"EnumIndex\" and \"EnumValue\"");
-                }
-
-                return new DataValue(new Variant(valueToWrite));
+                
             }
             else if (variableNode.ValueRank == 1)
             {
@@ -1349,6 +1256,7 @@ namespace WebPlatform.OPCUALayer
                     throw new ValueToWriteTypeException("Wrong Type Error: the JSON Array sent is not a JSON Object Array as expected");
                 Int32[] valuesToWriteArray = new Int32[flatValuesToWrite.Length];
                 JObject jObject;
+                
                 for (int i = 0; i < flatValuesToWrite.Length; i++)
                 {
                     jObject = flatValuesToWrite[i].ToObject<JObject>();

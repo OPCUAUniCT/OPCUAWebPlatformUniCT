@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,9 +9,9 @@ using System.Xml;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Opc.Ua;
+using Opc.Ua.Client;
 using WebPlatform.Exceptions;
 using WebPlatform.Extensions;
-using TypeInfo = Opc.Ua.TypeInfo;
 
 namespace WebPlatform.OPC_UA_Layer
 {
@@ -20,6 +21,8 @@ namespace WebPlatform.OPC_UA_Layer
         private JsonTextReader m_reader;
         private Dictionary<string, object> m_root;
         private Stack<object> m_stack;
+        private Session m_session;
+        private NodeId m_currentDataType;
         private ServiceMessageContext m_context;
         private ushort[] m_namespaceMappings;
         private ushort[] m_serverMappings;
@@ -28,12 +31,14 @@ namespace WebPlatform.OPC_UA_Layer
 
         #region Constructors
         
-        private PlatformJsonDecoder(string json, ServiceMessageContext context, int[] dimensions): base (json, context)
+        private PlatformJsonDecoder(string json, NodeId dataTypeId, Session session, int[] dimensions): base (json, session.MessageContext)
         {
-            if (context == null)
-                throw new ArgumentNullException(nameof (context));
+            if (session == null)
+                throw new ArgumentNullException(nameof (session));
             this.Initialize();
-            m_context = context;
+            m_session = session;
+            m_currentDataType = dataTypeId;
+            m_context = session.MessageContext;
             m_nestingLevel = 0U;
             m_reader = new JsonTextReader((TextReader) new StringReader(json));
             m_root = this.ReadObject();
@@ -51,9 +56,9 @@ namespace WebPlatform.OPC_UA_Layer
 
         public int[] Dimensions { get; set; }
 
-        public static PlatformJsonDecoder CreateDecoder(string json, ServiceMessageContext context, int[] dimensions = null)
+        public static PlatformJsonDecoder CreateDecoder(string json, NodeId dataTypeId, Session session, int[] dimensions = null)
         {
-            return new PlatformJsonDecoder(json, context, dimensions);
+            return new PlatformJsonDecoder(json, dataTypeId, session, dimensions);
         }
         
         #region Public Methods
@@ -211,7 +216,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -238,7 +243,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -265,7 +270,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -292,7 +297,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -319,7 +324,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -347,7 +352,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -374,7 +379,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -396,7 +401,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as long?;
+            var value = long.TryParse(Convert.ToString(token), out var tmp) ? tmp : (long?) null;
 
             if (value == null)
             {
@@ -423,7 +428,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as double?;
+            var value = double.TryParse(Convert.ToString(token), out var tmp) ? tmp : (double?) null;
 
             if (value == null)
             {
@@ -450,7 +455,7 @@ namespace WebPlatform.OPC_UA_Layer
                 throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
             }
 
-            var value = token as double?;
+            var value = double.TryParse(Convert.ToString(token), out var tmp) ? tmp : (double?) null;
 
             if (value == null)
             {
@@ -811,6 +816,62 @@ namespace WebPlatform.OPC_UA_Layer
             }
 
             return new LocalizedText(locale, text);
+        }
+        
+        /// <summary>
+        /// Reads an Enumeration from the stream.
+        /// </summary>
+        public int ReadEnumeration(string fieldName)
+        {
+            object token = null;
+
+            if (!ReadField(fieldName, out token))
+            {
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
+            }
+
+            var value = token as Dictionary<string, object>;
+
+            if (value == null)
+            {
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " is not an Object as expected");
+            }
+            
+            int enumIndex;
+            string enumValue = null;
+            
+            try
+            {
+                m_stack.Push(value);
+
+                if (!value.ContainsKey("EnumIndex") || !value.ContainsKey("EnumValue"))
+                {
+                    throw new ValueToWriteTypeException("Error: Property named " + fieldName + " must have the properties EnumIndex, and EnumValues");
+                }
+
+                enumIndex = ReadInt32("EnumIndex");
+                enumValue = ReadString("EnumValue");
+               
+            }
+            finally
+            {
+                m_stack.Pop();
+            }
+
+            //check if the index match the enumValue
+            var enumTuple = m_session.GetEnumStrings(m_currentDataType);
+
+            if (enumTuple.enumStrings != null && (enumIndex > enumTuple.enumStrings.Length || enumIndex < 0 || enumTuple.enumStrings[enumIndex] != enumValue))
+                throw new ValueToWriteTypeException("Wrong corrispondence between EnumIndex and EnumValue");
+
+            if (enumTuple.enumValues != null)
+            {
+                var enVal = enumTuple.enumValues.SingleOrDefault(s => s.Value == enumIndex);
+                if (enVal == null || enVal.DisplayName.Text != enumValue)
+                    throw new ValueToWriteTypeException("Wrong corrispondence between EnumIndex and EnumValue");
+            }
+            
+            return enumIndex;
         }
 
         private bool ReadArrayField(string fieldName, out List<object> array)
@@ -1497,6 +1558,34 @@ namespace WebPlatform.OPC_UA_Layer
                 {
                     m_stack.Push(token[ii]);
                     var element = ReadLocalizedText(null);
+                    values.Add(element);
+                }
+                finally
+                {
+                    m_stack.Pop();
+                }
+            }
+
+            return values;
+        }
+        
+        public Int32Collection ReadEnumerationArray(string fieldName)
+        {
+            var values = new Int32Collection();
+
+            List<object> token = null;
+
+            if (!ReadArrayField(fieldName, out token))
+            {
+                throw new ValueToWriteTypeException("Error: Property named " + fieldName + " missing");
+            }
+
+            foreach (var t in token)
+            {
+                try
+                {
+                    m_stack.Push(t);
+                    var element = ReadEnumeration(null);
                     values.Add(element);
                 }
                 finally
