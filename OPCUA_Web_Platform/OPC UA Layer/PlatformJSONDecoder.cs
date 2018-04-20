@@ -883,7 +883,7 @@ namespace WebPlatform.OPC_UA_Layer
         /// </summary>
         public new ExtensionObject ReadExtensionObject(string fieldName)
         {
-            var jObject = m_currentJObject["Value"].ToObject<JObject>();
+            var jObject = m_currentJObject[fieldName].ToObject<JObject>();
             
             if (m_currentDataType.NamespaceIndex != 0)
             {
@@ -911,7 +911,46 @@ namespace WebPlatform.OPC_UA_Layer
             return new ExtensionObject(m_currentDataType, valueToWrite);
         }
         
+        /// <summary>
+        /// Reads an extension object from the stream.
+        /// </summary>
+        public new ExtensionObjectCollection ReadExtensionObjectArray(string fieldName)
+        {
+            var extensionObjectCollection = new ExtensionObjectCollection();
+            var jArray = m_currentJObject[fieldName].ToObject<JArray>();
+
+            if (m_currentDataType.NamespaceIndex != 0)
+            {
+                var analyzer = new DataTypeAnalyzer(m_session);
+                var encodingNodeId = analyzer.GetDataTypeEncodingNodeId(m_currentDataType);
+                var descriptionNodeId = analyzer.GetDataTypeDescriptionNodeId(encodingNodeId);
+                string dictionary = analyzer.GetDictionary(descriptionNodeId);
+                string descriptionId = m_session.ReadNodeAttribute(descriptionNodeId, Attributes.Value)[0].Value.ToString();
+                StructuredEncoder structuredEncoder = new StructuredEncoder(dictionary);
+                foreach (var jObj in jArray)
+                {
+                   extensionObjectCollection.Add(structuredEncoder.BuildExtensionObjectFromJSONObject(descriptionId, jObj.ToObject<JObject>(),
+                        m_session.MessageContext, encodingNodeId));
+                }
+
+                return extensionObjectCollection;
+            }
+            
+            var systemType = TypeInfo.GetSystemType(m_currentDataType, m_session.Factory);
+            foreach (var jObj in jArray)
+            {
+                var jsonDecoder = CreateDecoder(jObj.ToObject<JObject>().ToString(), m_currentDataType, m_session);
+                if (!(Activator.CreateInstance(systemType) is IEncodeable valueToWrite))
+                {
+                    throw new ValueToWriteTypeException("Found a Standard Structured DataType not IEncodable");
+                }
         
+                valueToWrite.Decode(jsonDecoder);
+                extensionObjectCollection.Add(new ExtensionObject(m_currentDataType, valueToWrite));
+            }
+
+            return extensionObjectCollection;
+        }
         
         
         

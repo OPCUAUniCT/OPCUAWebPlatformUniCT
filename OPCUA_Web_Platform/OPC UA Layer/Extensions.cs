@@ -231,7 +231,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.LocalizedText:
                     return () => new Variant(decoder.ReadLocalizedTextArray("Value").ToArray());
                 case BuiltInType.ExtensionObject:
-                    throw new NotImplementedException();
+                    return () => new Variant(decoder.ReadExtensionObjectArray("Value").ToArray());
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(decoder.ReadDiagnosticInfoArray("Value").ToArray());
                 case BuiltInType.Enumeration:
@@ -288,7 +288,7 @@ namespace WebPlatform.Extensions
                 case BuiltInType.LocalizedText:
                     return () => new Variant(new Matrix(decoder.ReadLocalizedTextArray("Value").ToArray(), builtIn, decoder.Dimensions));
                 case BuiltInType.ExtensionObject:
-                    throw new NotImplementedException();
+                    return () => new Variant(new Matrix(decoder.ReadExtensionObjectArray("Value").ToArray(), builtIn, decoder.Dimensions));
                 case BuiltInType.DiagnosticInfo:
                     return () => new Variant(new Matrix(decoder.ReadDiagnosticInfoArray("Value").ToArray(), builtIn, decoder.Dimensions));
                 case BuiltInType.Enumeration:
