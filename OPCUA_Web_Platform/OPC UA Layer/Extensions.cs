@@ -360,5 +360,19 @@ namespace WebPlatform.Extensions
 
             return dataValueCollection;
         }
+        
+        public static bool IsServerStatusGood(this Session session)
+        {
+            DataValue serverStatus;
+            try
+            {
+                serverStatus = session.ReadValue(new NodeId(2259, 0));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            return DataValue.IsGood(serverStatus) && (int)serverStatus.Value == 0;
+        }
     }
 }
