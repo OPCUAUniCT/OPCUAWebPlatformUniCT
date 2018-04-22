@@ -30,4 +30,9 @@
     <Compile Remove="Models\AuthCredentials.cs" />
     <Compile Remove="OPC UA Layer\EmptyClass.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="OPCUAWebPlatform.Config.xml">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
 </Project>

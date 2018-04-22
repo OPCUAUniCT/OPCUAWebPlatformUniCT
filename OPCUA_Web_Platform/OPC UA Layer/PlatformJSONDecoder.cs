@@ -162,7 +162,7 @@ namespace WebPlatform.OPC_UA_Layer
         #region IDecoder Members
         
 
-        public bool ReadField(string fieldName, out object token)
+        public new bool ReadField(string fieldName, out object token)
         {
             token = null;
 
