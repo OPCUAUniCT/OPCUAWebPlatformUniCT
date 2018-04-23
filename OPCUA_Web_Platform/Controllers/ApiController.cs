@@ -52,13 +52,12 @@ namespace WebPlatform.Controllers
                 return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
 
             var decodedNodeId = WebUtility.UrlDecode(node_id);
-            
-            Node sourceNode;
-            JObject result = new JObject();
+
+            var result = new JObject();
 
             try 
             {
-			    sourceNode = await _uaClient.ReadNodeAsync(serverUrl, decodedNodeId);
+			    var sourceNode = await _uaClient.ReadNodeAsync(serverUrl, decodedNodeId);
                 result["node-id"] = decodedNodeId;
                 result["name"] = sourceNode.DisplayName.Text;
 
@@ -302,6 +301,9 @@ namespace WebPlatform.Controllers
             }
             
             var serverUrl = _uaServers[ds_id].Url;
+            if (!(await _uaClient.IsServerAvailable(serverUrl)))
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
+            
             bool[] results;
             try 
             {

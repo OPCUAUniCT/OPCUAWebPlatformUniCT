@@ -102,7 +102,7 @@ namespace WebPlatform.OPCUALayer
 
             var browser = new Browser(session)
             {
-                NodeClassMask = 0,
+                NodeClassMask = (int)NodeClass.Method | (int)NodeClass.Object| (int)NodeClass.Variable,
                 ResultMask = (uint)BrowseResultMask.DisplayName | (uint)BrowseResultMask.NodeClass | (uint)BrowseResultMask.ReferenceTypeInfo,
                 BrowseDirection = BrowseDirection.Forward,
                 ReferenceTypeId = ReferenceTypeIds.HierarchicalReferences
@@ -154,22 +154,20 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
-            var session = await GetSessionAsync(serverUrlstring);
-            
-            DataValue serverStatus;
+            Session session;
             try
             {
-                serverStatus = session.ReadValue(new NodeId(2259, 0));
+                session = await GetSessionAsync(serverUrlstring);
             }
-            catch (Exception)
+            catch (Exception exc)
             {
-                return await RestoreSessionAsync(serverUrlstring);
+                return false;
             }
-            
-            //If StatusCode of the Variable read is not Good or if the Value is not equal to Running (0)
-            //the OPC UA Server is not available
-            return DataValue.IsGood(serverStatus) && (int)serverStatus.Value == 0;
+            if(session.IsServerStatusGood())
+                return true;
+            return await RestoreSessionAsync(serverUrlstring);
         }
+
         
         public async Task<string> GetDeadBandAsync(string serverUrl, VariableNode varNode)
         {
@@ -382,16 +380,16 @@ namespace WebPlatform.OPCUALayer
                 if(_sessions.ContainsKey(serverUrlstring))
                     _sessions.Remove(serverUrlstring);
             }
-            
+
+            Session session;
             try
             {
-                await GetSessionAsync(serverUrlstring);
+                return (await GetSessionAsync(serverUrlstring)).IsServerStatusGood();
             }
-            catch (ServiceResultException)
+            catch (Exception)
             {
                 return false;
             }
-            return true;
         }
 
         private async Task<Session> GetSessionAsync(string serverUrl)
