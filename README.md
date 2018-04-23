@@ -72,7 +72,7 @@ in order to expose your OPC UA Servers through the OPC UA Web Platform interface
 2. Edit the application configuration file **appsettings.json** setting all
 the information relevant to the OPC UA servers you want to be exposed by the platform
 
-    ```json
+    ```js
     "OPCUAServersOptions": {
         "Servers": [
           {
@@ -138,7 +138,7 @@ curl -X GET http://{{YOUR-URL}}:5000/api/data-sets/2/nodes
 
 It will return the response:
 
-```json
+```js
 {
     "node-id": "0-85",
     "name": "Objects",
@@ -188,7 +188,7 @@ curl -X GET \
 
 It will return the response:
 
-```
+```js
 {
     "node-id": "2-Demo.Static.Scalar.WorkOrder",
     "name": "WorkOrder",
