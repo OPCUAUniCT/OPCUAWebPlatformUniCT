@@ -10,6 +10,7 @@ TestResults/
 # globs
 Makefile.in
 *.DS_Store
+*.vs
 *.sln.cache
 *.suo
 *.cache
@@ -35,6 +36,6 @@ Thumbs.db
 # resharper
 *_Resharper.*
 *.Resharper
-
+*.idea
 # dotCover
 *.dotCover
