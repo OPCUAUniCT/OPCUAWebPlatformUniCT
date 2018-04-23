@@ -154,22 +154,17 @@ namespace WebPlatform.OPCUALayer
 
         public async Task<bool> IsServerAvailable(string serverUrlstring)
         {
-            //Try to get a session for the OPC UA Server specified
             Session session;
             try
             {
                 session = await GetSessionAsync(serverUrlstring);
             }
-            //If is not possible to obtain a session using the GetSessionAsync method, the server is not available (See GetSessionAsync)
             catch (Exception exc)
             {
                 return false;
             }
-            //If a session is obtained, try to see if the ServerStatus is good.
             if(session.IsServerStatusGood())
                 return true;
-            //if ServerStatus is not good, try to restore the session using RestoreSessionAsync method
-            //N.B. if is not possible to restore a session, the server is not available method return false
             return await RestoreSessionAsync(serverUrlstring);
         }
 

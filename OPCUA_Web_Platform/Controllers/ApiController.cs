@@ -273,10 +273,6 @@ namespace WebPlatform.Controllers
         {
             if (ds_id < 0 || ds_id >= _uaServers.Length) return NotFound($"There is no Data Set for id {ds_id}");
 
-            var serverUrl = _uaServers[ds_id].Url;
-            if (!(await _uaClient.IsServerAvailable(serverUrl)))
-                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
-            
             if (monitorParams == null || !monitorParams.IsValid())
             {
                 return BadRequest(new
@@ -303,6 +299,10 @@ namespace WebPlatform.Controllers
                     });
                 }
             }
+            
+            var serverUrl = _uaServers[ds_id].Url;
+            if (!(await _uaClient.IsServerAvailable(serverUrl)))
+                return StatusCode(500, "Data Set " + ds_id + " NotAvailable");
             
             bool[] results;
             try 
