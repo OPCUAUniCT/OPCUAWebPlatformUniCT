@@ -15,6 +15,9 @@ and edges.
 Furthermore, web platform manage the monitoring of variables by means of 
 publish/subscribe communication based on MQTT and/or SignalR.
 
+
+![webplatformarc](https://user-images.githubusercontent.com/25839693/39619258-7a3c8c9c-4f87-11e8-91d2-cd2590fa7979.PNG)
+
 ## Features
 
 OPC UA Web Platform exposes the following resources through a RESTful
