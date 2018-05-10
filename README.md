@@ -104,6 +104,16 @@ an OPC UA Client, so it requires its own configuration).
 *Production* configuration. You can choose the configuration setting the 
 environment variable **ASPNETCORE_ENVIRONMENT**, as explained [here](https://docs.microsoft.com/it-it/aspnet/core/fundamentals/environments).
 
+### Run on Docker container
+
+It si possible running OPC UA Web Platform on Docker container with the following command
+
+`docker run --rm -it -p 5000:80 marsala/opcua-web-platform:1.0.0`
+
+### Troubleshooting
+
+You may occur in error like "DataSet Not Available" even if all the ip addresses or your OPC UA Server are perfectly configured. Be aware you have configured the platform **Instance Certificate** in the OPC UA Servers **Trusted** certificate store.
+
 ## Examples
 
 In the following will be highlighted some common use cases for the OPC UA Web Platform. Remember that all
