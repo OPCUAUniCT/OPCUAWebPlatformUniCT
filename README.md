@@ -340,3 +340,4 @@ may differs for some aspects but the concepts are quite similar:
 - [Integration of OPC UA into a web-based platform to enhance interoperability (ISIE 2017)](https://ieeexplore.ieee.org/document/8001417/)
 - [OPC UA integration into the web (IECON 2017)](https://ieeexplore.ieee.org/document/8216590/)
 - [A web-based platform for OPC UA integration in IIoT environment (ETFA 2017)](https://ieeexplore.ieee.org/document/8247713/)
+- [Integrating OPC UA with web technologies to enhance interoperability (Computer Standards & Interfaces 2018 - Elsevier)](https://doi.org/10.1016/j.csi.2018.04.004)
