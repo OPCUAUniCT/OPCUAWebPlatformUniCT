@@ -21,6 +21,7 @@ namespace WebPlatform.Auth
             if (context.Request.Path.StartsWithSegments("/api"))
             {
                 string authorization = context.Request.Headers["Authorization"];
+                authorization = (String.IsNullOrEmpty(authorization)) ? "Bearer " : authorization;
                 string token = "empty";
 
                 if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
