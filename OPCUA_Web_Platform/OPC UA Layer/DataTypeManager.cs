@@ -92,12 +92,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeBoolean(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-            
             if (variableNode.ValueRank == -1)
             {
                 var jBoolVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(Boolean)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Boolean} : null;
                 return new UaValue(jBoolVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -126,12 +124,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeInteger(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jIntVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(int)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Integer} : null;
                 return new UaValue(jIntVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -158,12 +154,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeByte(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jIntVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(int)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Integer} : null;
                 return new UaValue(jIntVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -195,12 +189,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeSByte(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jIntVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(int)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Integer} : null;
                 return new UaValue(jIntVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -230,12 +222,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeFloat(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jFloatVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(float)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Number} : null;;
                 return new UaValue(jFloatVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -260,12 +250,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeDouble(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jDoubleVal = new JValue(value.Value);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(double)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.Number} : null;
                 return new UaValue(jDoubleVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -290,12 +278,10 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeString(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 var jStringVal = new JValue(value.Value.ToString());
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(string)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.String} : null;
                 return new UaValue(jStringVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -409,8 +395,6 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeNodeId(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
                 NodeId nodeId = (NodeId)value.Value;
@@ -420,7 +404,7 @@ namespace WebPlatform.OPCUALayer
                 else
                     nodeIdRepresentation = nodeId.NamespaceIndex + "-" + nodeId.Identifier;
                 var jStringVal = new JValue(nodeIdRepresentation);
-                var schema = (generateSchema) ? schemaGenerator.Generate(typeof(string)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.String} : null;
                 return new UaValue(jStringVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -782,20 +766,16 @@ namespace WebPlatform.OPCUALayer
 
         private UaValue SerializeXmlElement(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
             //TODO:The stack is not able to handle xml elements. Bug maybe.
             throw new NotImplementedException();
         }
 
         private UaValue SerializeByteString(VariableNode variableNode, Variant value, bool generateSchema)
         {
-            var schemaGenerator = new JSchemaGenerator();
-
             if (variableNode.ValueRank == -1)
             {
-                //var jStringVal = new JValue(BitConverter.ToString((byte[])value.Value));
                 var jStringVal = new JValue(Convert.ToBase64String((byte[])value.Value));
-                var schema = generateSchema ? schemaGenerator.Generate(typeof(string)) : null;
+                var schema = (generateSchema) ? new JSchema {Type = JSchemaType.String} : null;
                 return new UaValue(jStringVal, schema);
             }
             else if (variableNode.ValueRank == 1)
@@ -804,7 +784,6 @@ namespace WebPlatform.OPCUALayer
                 var newArr = new List<string>();
                 foreach (var byteString in arr)
                 {
-                    //newArr.Add(BitConverter.ToString((byte[])byteString));
                     newArr.Add(Convert.ToBase64String((byte[])byteString));
                 }
                 var jArray = new JArray(newArr);
