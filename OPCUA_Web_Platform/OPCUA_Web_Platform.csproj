@@ -21,7 +21,7 @@
     <PackageReference Include="Microsoft.AspNetCore.All" Version="2.1.5" />
     <PackageReference Include="Newtonsoft.Json.Schema" Version="3.0.7" />
     <PackageReference Include="NJsonSchema" Version="9.10.27" />
-    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.4.353.15" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.4.365.10" />
   </ItemGroup>
   <ItemGroup>
     <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.0.0" />
